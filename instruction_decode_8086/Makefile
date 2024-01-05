@@ -1,2 +1,2 @@
 all:
-	gcc -Wall -Werror decoder.c -o decoder
+	gcc -std=c11 -Wall -Werror -D_POSIX_C_SOURCE=200809L decoder.c -o decoder
