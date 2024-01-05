@@ -35,12 +35,60 @@ char *register_map[8][2] = {
     { "BH", "DI" }
 };
 
+char *mov_source_effective_address[] = {
+    "BX + SI",
+    "BX + DI",
+    "BP + SI",
+    "BP + DI",
+    "SI",
+    "DI",
+    "BP",
+    "BX"
+};
+
 void usage(void) {
     fprintf(stderr, "8086 Instruction Decoder Usage:\n");
     fprintf(stderr, "-h         This help dialog.\n");
     fprintf(stderr, "-i <file>  Path to file to parse.\n");
     fprintf(stderr, "-o <file>  Path to file to generate output.\n");
     fprintf(stderr, "-v         Enable verbose output.\n");
+}
+
+/*
+ * Process a MOV immediate to register
+ *
+ * Returns number of bytes where consumed, so the caller
+ * can skip ahead to process the next unprocessed bytes
+ * in the buffer
+ */
+int process_mov_immediate_to_register(uint8_t *ptr) {
+    uint8_t data_low = 0;
+    uint8_t data_high = 0;
+    uint16_t data = 0;
+    int consumed_bytes = 1;
+    uint8_t bit_w = (*ptr>>3) & 0x1;
+    uint8_t reg = (*ptr & 0x7);
+    char *reg_str = register_map[reg][bit_w];
+    LOG("; [0x%x] Found IMMEDIATE TO REG MOV bitstream | W[%d] REG[0x%x][%s] | ", *ptr, bit_w, reg, reg_str);
+    // consume 2nd byte
+    ptr++;
+    consumed_bytes++;
+    data_low = *ptr;
+    LOG("Data Low[0x%x] ", data_low);
+    if (bit_w == 1) {
+        // consume 3nd byte
+        ptr++;
+        consumed_bytes++;
+        data_high = *ptr;
+        LOG("Data High[0x%x] ", data_high);
+    }
+    data = (data_high << 8) | data_low;
+    LOG("| Data [%d]\n", data);
+    
+    
+    printf("mov %s,%d\n", reg_str, data);
+    fprintf(out_fp, "mov %s,%d\n", reg_str, data);
+    return consumed_bytes;
 }
 
 /*
@@ -51,37 +99,152 @@ void usage(void) {
  * in the buffer
  */
 int process_mov_regmem_reg_inst(uint8_t *ptr) {
+    uint8_t data_low = 0;
+    uint8_t data_high = 0;
+    uint16_t data = 0;
     uint8_t bit_d = (*ptr & 0x2)>>1;
     uint8_t bit_w = *ptr & 0x1;
+    char *destination = NULL;
+    char *source = NULL;
     int consumed_bytes = 1;
-    LOG("; [0x%x] Found MOV bitstream | D[%d] W[%d] | ", *ptr, bit_d, bit_w);
+    LOG("; [0x%x] Found REG/MEM TO/FROM REGISTER MOV bitstream | D[%d] W[%d]\n", *ptr, bit_d, bit_w);
     // consume 2nd byte
     ptr++;
     uint8_t mod = (*ptr >> 6) & 0x3;
     uint8_t reg = (*ptr >> 3) & 0x7;
     uint8_t r_m = (*ptr >> 0) & 0x7;
     consumed_bytes++;
-    LOG("2nd Byte[0x%x] - MOD[0x%x] REG[0x%x] R/M[0x%x]\n", *ptr, mod, reg, r_m);
-    if (mod != 0x3) {
-        LOG("; Found MOD is not Register Mode, skipping decode...\n");
-        return consumed_bytes;
+    LOG("; 2nd Byte[0x%x] - MOD[0x%x] REG[0x%x] R/M[0x%x]\n", *ptr, mod, reg, r_m);
+    switch (mod) {
+        case 0x0:
+            // Memory Mode, No Displacement
+            // * except when R/M is 110 then 16bit displacement follows
+            if (r_m == 0x6) {
+                // special case R/M is 110
+                // 16 bit displacement follows
+                ptr++;
+                data_low = *ptr;
+                LOG("; 3rd Byte - Data Low[0x%x] | ", data_low);
+                ptr++;
+                data_high = *ptr;
+                LOG(" 4th Bytes - Data High[0x%x] | ", data_low);
+                data = (data_high << 8) | data_low;
+                LOG(" Data [%d]\n", data);
+                consumed_bytes+=2;
+                // destination specificed in REG field
+                destination = register_map[reg][bit_w];
+                // source is the direct address
+                printf("mov %s,%d\n", destination, data);
+                fprintf(out_fp, "mov %s,%d\n", destination, data);
+            } else {
+                if (bit_d == 0x1) {
+                    // destination specificed in REG field
+                    destination = register_map[reg][bit_w];
+                    // source specified in effective address table
+                    source = mov_source_effective_address[r_m];
+                    printf("mov %s, [%s]\n", destination, source);
+                    fprintf(out_fp, "mov %s, [%s]\n", destination, source);
+                } else {
+                    // destination specificed in R/M field
+                    destination = mov_source_effective_address[r_m];
+                    // source specified in REG field
+                    source = register_map[reg][bit_w];
+                    printf("mov [%s], %s\n", destination, source);
+                    fprintf(out_fp, "mov [%s], %s\n", destination, source);
+                }
+            }
+            break;
+        case 0x1:
+            // Memory Mode, 8bit displacement follows
+            ptr++;
+            consumed_bytes++;
+            data = *ptr;
+            LOG("; 3rd Byte - Data[0x%x]\n", data);
+            if (bit_d == 0x1) {
+                // destination specificed in REG field
+                destination = register_map[reg][bit_w];
+                // source specified in effective address table
+                source = mov_source_effective_address[r_m];
+                if (data==0) {
+                    // don't output " + 0" in the effective address calculation
+                    printf("mov %s, [%s]\n", destination, source);
+                    fprintf(out_fp, "mov %s, [%s]\n", destination, source);
+                } else {
+                    printf("mov %s, [%s + %d]\n", destination, source, data);
+                    fprintf(out_fp, "mov %s, [%s + %d]\n", destination, source, data);
+                }
+            } else {
+                // destination specificed in R/M field
+                destination = mov_source_effective_address[r_m];
+                // source specified in REG field
+                source = register_map[reg][bit_w];
+                if (data==0) {
+                    // don't output " + 0" in the effective address calculation
+                    printf("mov [%s], %s\n", destination, source);
+                    fprintf(out_fp, "mov [%s], %s\n", destination, source);
+                } else {
+                    printf("mov [%s + %d], %s\n", destination, data, source);
+                    fprintf(out_fp, "mov [%s + %d], %s\n", destination,  data, source);
+                }
+            }
+            break;
+        case 0x2:
+            // Memory Mode, 16bit displacement follows
+            ptr++;
+            data_low = *ptr;
+            LOG("; 3rd Byte - Data Low[0x%x] | ", data_low);
+            ptr++;
+            data_high = *ptr;
+            LOG(" 4th Bytes - Data High[0x%x] | ", data_low);
+            data = (data_high << 8) | data_low;
+            LOG(" Data [%d]\n", data);
+            consumed_bytes+=2;
+            if (bit_d == 0x1) {
+                // destination specificed in REG field
+                destination = register_map[reg][bit_w];
+                // source specified in effective address table
+                source = mov_source_effective_address[r_m];
+                if (data==0) {
+                    // don't output " + 0" in the effective address calculation
+                    printf("mov %s, [%s]\n", destination, source);
+                    fprintf(out_fp, "mov %s, [%s]\n", destination, source);
+                } else {
+                    printf("mov %s, [%s + %d]\n", destination, source, data);
+                    fprintf(out_fp, "mov %s, [%s + %d]\n", destination, source, data);
+                }
+            } else {
+                // destination specificed in R/M field
+                destination = mov_source_effective_address[r_m];
+                // source specified in REG field
+                source = register_map[reg][bit_w];
+                if (data==0) {
+                    // don't output " + 0" in the effective address calculation
+                    printf("mov [%s], %s\n", destination, source);
+                    fprintf(out_fp, "mov [%s], %s\n", destination, source);
+                } else {
+                    printf("mov [%s + %d], %s\n", destination, data, source);
+                    fprintf(out_fp, "mov [%s + %d], %s\n", destination,  data, source);
+                }
+            }
+            break;
+        case 0x3:
+            // Register Mode, No Displacement
+            // get destination/source
+            if (bit_d == 0x1) {
+                // destination specificed in REG field
+                destination = register_map[reg][bit_w];
+                // source specificed in R/M field
+                source = register_map[r_m][bit_w];
+            } else {
+                // destination specificed in R/M field
+                destination = register_map[r_m][bit_w];
+                // source specificed in REG field
+                source = register_map[reg][bit_w];
+            }
+            printf("mov %s,%s\n", destination, source);
+            fprintf(out_fp, "mov %s,%s\n", destination, source);
+            break;
     }
-    char *destination = NULL;
-    char *source = NULL;
-    // get destination/source
-    if (bit_d == 0x1) {
-        // destination specificed in REG field
-        destination = register_map[reg][bit_w];
-        // source specificed in R/M field
-        source = register_map[r_m][bit_w];
-    } else {
-        // destination specificed in R/M field
-        destination = register_map[r_m][bit_w];
-        // source specificed in REG field
-        source = register_map[reg][bit_w];
-    }
-    printf("mov %s,%s\n", destination, source);
-    fprintf(out_fp, "mov %s,%s\n", destination, source);
     return consumed_bytes;
 }
 
@@ -176,12 +339,14 @@ int main (int argc, char *argv[]) {
         // so we inspect on a per byte basis
         while (bytes_available>0) {
             int consumed_bytes = 0;
-            // is the next byte in the buffer a mov instruction?
-            // just inspect bits 8->2 for MOV code
-            if ( (*ptr>>2) == MOV_REGMEM_REG_INSTRUCTION) {
+            if ((*ptr>>4) == MOV_IMMEDIATE_TO_REG_INSTRUCTION) {
+                // found immediate to register move
+                consumed_bytes = process_mov_immediate_to_register(ptr);
+            } else if ( (*ptr>>2) == MOV_REGMEM_REG_INSTRUCTION) {
+                // found move register/memory to/from register
                 consumed_bytes = process_mov_regmem_reg_inst(ptr);
             } else {
-                LOG("; [0x%x] not a MOV instruction, continue search...\n", *ptr);
+                LOG("; [0x%x] not a recognized instruction, continue search...\n", *ptr);
                 consumed_bytes = 1;
             }
             ptr+=consumed_bytes;
