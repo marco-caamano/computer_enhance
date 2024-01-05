@@ -16,9 +16,13 @@
 #define BUFFER_SIZE 4096
 
 // mov 100010DW => 10 0010
-#define MOV_BITSTREAM   0x22
+#define MOV_REGMEM_REG_INSTRUCTION          0x22
+// mov 1011WREG => 1011
+#define MOV_IMMEDIATE_TO_REG_INSTRUCTION    0xb
 
 bool verbose = false;
+FILE *in_fp = NULL;
+FILE *out_fp = NULL;
 
 char *register_map[8][2] = {
     { "AL", "AX" }, 
@@ -39,14 +43,54 @@ void usage(void) {
     fprintf(stderr, "-v         Enable verbose output.\n");
 }
 
+/*
+ * Process a MOV register/memory to/from register
+ *
+ * Returns number of bytes where consumed, so the caller
+ * can skip ahead to process the next unprocessed bytes
+ * in the buffer
+ */
+int process_mov_regmem_reg_inst(uint8_t *ptr) {
+    uint8_t bit_d = (*ptr & 0x2)>>1;
+    uint8_t bit_w = *ptr & 0x1;
+    int consumed_bytes = 1;
+    LOG("; [0x%x] Found MOV bitstream | D[%d] W[%d] | ", *ptr, bit_d, bit_w);
+    // consume 2nd byte
+    ptr++;
+    uint8_t mod = (*ptr >> 6) & 0x3;
+    uint8_t reg = (*ptr >> 3) & 0x7;
+    uint8_t r_m = (*ptr >> 0) & 0x7;
+    consumed_bytes++;
+    LOG("2nd Byte[0x%x] - MOD[0x%x] REG[0x%x] R/M[0x%x]\n", *ptr, mod, reg, r_m);
+    if (mod != 0x3) {
+        LOG("; Found MOD is not Register Mode, skipping decode...\n");
+        return consumed_bytes;
+    }
+    char *destination = NULL;
+    char *source = NULL;
+    // get destination/source
+    if (bit_d == 0x1) {
+        // destination specificed in REG field
+        destination = register_map[reg][bit_w];
+        // source specificed in R/M field
+        source = register_map[r_m][bit_w];
+    } else {
+        // destination specificed in R/M field
+        destination = register_map[r_m][bit_w];
+        // source specificed in REG field
+        source = register_map[reg][bit_w];
+    }
+    printf("mov %s,%s\n", destination, source);
+    fprintf(out_fp, "mov %s,%s\n", destination, source);
+    return consumed_bytes;
+}
+
 int main (int argc, char *argv[]) {
     int opt;
     char *input_file = NULL;
     char *output_file = NULL;    
     uint8_t *buffer = NULL;
-    FILE *in_fp = NULL;
-    FILE *out_fp = NULL;
-    size_t ret;
+    size_t bytes_available;
 
     while( (opt = getopt(argc, argv, "hi:o:v")) != -1) {
         switch (opt) {
@@ -123,56 +167,28 @@ int main (int argc, char *argv[]) {
     printf("bits 16\n\n");
     fprintf(out_fp, "bits 16\n\n");
 
-    ret = -1;
-    while ( (ret = fread(buffer, 1, BUFFER_SIZE, in_fp)) != 0) {
+    bytes_available = -1;
+    while ( (bytes_available = fread(buffer, 1, BUFFER_SIZE, in_fp)) != 0) {
         uint8_t *ptr = buffer;
-        LOG("; Read [%zu] bytes from file\n", ret);
+        LOG("; Read [%zu] bytes from file\n", bytes_available);
 
         // 8086 instructions can be encoded from 1 to 6 bytes
         // so we inspect on a per byte basis
-        for (int i=0; i<ret; i++) {
+        while (bytes_available>0) {
+            int consumed_bytes = 0;
             // is the next byte in the buffer a mov instruction?
             // just inspect bits 8->2 for MOV code
-            if ( (*ptr>>2) == MOV_BITSTREAM) {
-                uint8_t bit_d = (*ptr & 0x2)>>1;
-                uint8_t bit_w = *ptr & 0x1;
-                LOG("; [0x%x] Found MOV bitstream | D[%d] W[%d] | ", *ptr, bit_d, bit_w);
-                ptr++;
-                i++;
-                // consume 2nd byte
-                uint8_t mod = (*ptr >> 6) & 0x3;
-                uint8_t reg = (*ptr >> 3) & 0x7;
-                uint8_t r_m = (*ptr >> 0) & 0x7;
-                LOG("2nd Byte[0x%x] - MOD[0x%x] REG[0x%x] R/M[0x%x]\n", *ptr, mod, reg, r_m);
-                if (mod != 0x3) {
-                    LOG("; Found MOD is not Register Mode, skipping decode...\n");
-                } else {
-                    char *destination = NULL;
-                    char *source = NULL;
-                    // get destination/source
-                    if (bit_d == 0x1) {
-                        // destination specificed in REG field
-                        destination = register_map[reg][bit_w];
-                        // source specificed in R/M field
-                        source = register_map[r_m][bit_w];
-                    } else {
-                        // destination specificed in R/M field
-                        destination = register_map[r_m][bit_w];
-                        // source specificed in REG field
-                        source = register_map[reg][bit_w];
-                    }
-                    printf("mov %s,%s\n", destination, source);
-                    fprintf(out_fp, "mov %s,%s\n", destination, source);
-                }
+            if ( (*ptr>>2) == MOV_REGMEM_REG_INSTRUCTION) {
+                consumed_bytes = process_mov_regmem_reg_inst(ptr);
             } else {
                 LOG("; [0x%x] not a MOV instruction, continue search...\n", *ptr);
+                consumed_bytes = 1;
             }
-            ptr++;
+            ptr+=consumed_bytes;
+            bytes_available -= consumed_bytes;
         }
-        
- 
     }
-    LOG("; Read [%zu] bytes from file\n", ret);
+    LOG("; Read [%zu] bytes from file\n", bytes_available);
 
     fclose(in_fp);
     fclose(out_fp);

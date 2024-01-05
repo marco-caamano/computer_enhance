@@ -1,3 +1,10 @@
+#ignore binary
+decoder
+
+#ignore assembler files and binaries
+*.asm
+*.bin
+
 # Prerequisites
 *.d
 
