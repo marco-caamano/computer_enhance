@@ -64,7 +64,7 @@ void usage(void) {
 int process_mov_immediate_to_register(uint8_t *ptr) {
     uint8_t data_low = 0;
     uint8_t data_high = 0;
-    uint16_t data = 0;
+    int16_t data = 0;
     int consumed_bytes = 1;
     uint8_t bit_w = (*ptr>>3) & 0x1;
     uint8_t reg = (*ptr & 0x7);
@@ -74,16 +74,16 @@ int process_mov_immediate_to_register(uint8_t *ptr) {
     ptr++;
     consumed_bytes++;
     data_low = *ptr;
-    LOG("Data Low[0x%x] ", data_low);
+    LOG("Data Low[0x%02x] ", data_low);
     if (bit_w == 1) {
-        // consume 3nd byte
+        // consume 3rd byte
         ptr++;
         consumed_bytes++;
         data_high = *ptr;
-        LOG("Data High[0x%x] ", data_high);
+        LOG("Data High[0x%02x] ", data_high);
     }
     data = (data_high << 8) | data_low;
-    LOG("| Data [%d]\n", data);
+    LOG("| Data [0x%04x][%d]\n", data, data);
     
     
     printf("mov %s,%d\n", reg_str, data);
@@ -101,7 +101,7 @@ int process_mov_immediate_to_register(uint8_t *ptr) {
 int process_mov_regmem_reg_inst(uint8_t *ptr) {
     uint8_t data_low = 0;
     uint8_t data_high = 0;
-    uint16_t data = 0;
+    int16_t data = 0;
     uint8_t bit_d = (*ptr & 0x2)>>1;
     uint8_t bit_w = *ptr & 0x1;
     char *destination = NULL;
@@ -114,7 +114,7 @@ int process_mov_regmem_reg_inst(uint8_t *ptr) {
     uint8_t reg = (*ptr >> 3) & 0x7;
     uint8_t r_m = (*ptr >> 0) & 0x7;
     consumed_bytes++;
-    LOG("; 2nd Byte[0x%x] - MOD[0x%x] REG[0x%x] R/M[0x%x]\n", *ptr, mod, reg, r_m);
+    LOG("; [0x%x] 2nd Byte - MOD[0x%x] REG[0x%x] R/M[0x%x]\n", *ptr, mod, reg, r_m);
     switch (mod) {
         case 0x0:
             // Memory Mode, No Displacement
@@ -124,18 +124,18 @@ int process_mov_regmem_reg_inst(uint8_t *ptr) {
                 // 16 bit displacement follows
                 ptr++;
                 data_low = *ptr;
-                LOG("; 3rd Byte - Data Low[0x%x] | ", data_low);
+                LOG("; [0x%x] 3rd Byte - Data Low[0x%02x] \n", data_low, data_low);
                 ptr++;
                 data_high = *ptr;
-                LOG(" 4th Bytes - Data High[0x%x] | ", data_low);
+                LOG("; [0x%x] 4th Byte - Data High[0x%02x] | ", data_high, data_high);
                 data = (data_high << 8) | data_low;
-                LOG(" Data [%d]\n", data);
+                LOG(" Data [0x%04x][%d]\n", data, data);
                 consumed_bytes+=2;
                 // destination specificed in REG field
                 destination = register_map[reg][bit_w];
                 // source is the direct address
-                printf("mov %s,%d\n", destination, data);
-                fprintf(out_fp, "mov %s,%d\n", destination, data);
+                printf("mov %s, [%d]\n", destination, data);
+                fprintf(out_fp, "mov %s, [%d]\n", destination, data);
             } else {
                 if (bit_d == 0x1) {
                     // destination specificed in REG field
@@ -158,8 +158,15 @@ int process_mov_regmem_reg_inst(uint8_t *ptr) {
             // Memory Mode, 8bit displacement follows
             ptr++;
             consumed_bytes++;
-            data = *ptr;
-            LOG("; 3rd Byte - Data[0x%x]\n", data);
+            // check if we need to do 8bit to 16bit signed extension
+            if ((*ptr>>7) == 0x1 ) {
+                // MSB bit is set, then do signed extension
+                data = (0xFF<<8) | *ptr;
+                LOG("; [0x%x] 3rd Byte - Data[0x%x] signed extended to [%d]\n", *ptr, *ptr, data);
+            } else {
+                data = *ptr;
+                LOG("; [0x%x] 3rd Byte - Data[0x%x][%d]\n", data, data, data);
+            }
             if (bit_d == 0x1) {
                 // destination specificed in REG field
                 destination = register_map[reg][bit_w];
@@ -192,12 +199,12 @@ int process_mov_regmem_reg_inst(uint8_t *ptr) {
             // Memory Mode, 16bit displacement follows
             ptr++;
             data_low = *ptr;
-            LOG("; 3rd Byte - Data Low[0x%x] | ", data_low);
+            LOG("; [0x%x] 3rd Byte - Data Low[0x%02x] \n ", data_low, data_low);
             ptr++;
             data_high = *ptr;
-            LOG(" 4th Bytes - Data High[0x%x] | ", data_low);
+            LOG(" [0x%x] 4th Byte - Data High[0x%02x] | ", data_high, data_high);
             data = (data_high << 8) | data_low;
-            LOG(" Data [%d]\n", data);
+            LOG(" Data [0x%04x][%d]\n", data, data);
             consumed_bytes+=2;
             if (bit_d == 0x1) {
                 // destination specificed in REG field
@@ -333,7 +340,7 @@ int main (int argc, char *argv[]) {
     bytes_available = -1;
     while ( (bytes_available = fread(buffer, 1, BUFFER_SIZE, in_fp)) != 0) {
         uint8_t *ptr = buffer;
-        LOG("; Read [%zu] bytes from file\n", bytes_available);
+        LOG("; Read [%zu] bytes from file\n\n", bytes_available);
 
         // 8086 instructions can be encoded from 1 to 6 bytes
         // so we inspect on a per byte basis
@@ -349,6 +356,7 @@ int main (int argc, char *argv[]) {
                 LOG("; [0x%x] not a recognized instruction, continue search...\n", *ptr);
                 consumed_bytes = 1;
             }
+            LOG("\n");
             ptr+=consumed_bytes;
             bytes_available -= consumed_bytes;
         }
