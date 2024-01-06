@@ -21,6 +21,10 @@
 #define MOV_IMMEDIATE_TO_REGMEM_INSTRUCTION 0x63
 // mov 1011WREG => 1011
 #define MOV_IMMEDIATE_TO_REG_INSTRUCTION    0xb
+// mov 1010000W => 101 0000
+#define MOV_MEMORY_TO_ACCUMULATOR           0x50
+// mov 1010001W => 101 0001
+#define MOV_ACCUMULATOR_TO_MEMORY           0x51
 
 bool verbose = false;
 FILE *in_fp = NULL;
@@ -64,6 +68,78 @@ void usage(void) {
     fprintf(stderr, "-i <file>  Path to file to parse.\n");
     fprintf(stderr, "-o <file>  Path to file to generate output.\n");
     fprintf(stderr, "-v         Enable verbose output.\n");
+}
+
+/*
+ * Process a Memory to Accumulator MOV
+ *
+ * Returns number of bytes where consumed, so the caller
+ * can skip ahead to process the next unprocessed bytes
+ * in the buffer
+ */
+int process_mov_mem_to_accumulator_inst(uint8_t *ptr) {
+    uint8_t address_low = 0;
+    uint8_t address_high = 0;
+    int16_t address = 0;
+    int consumed_bytes = 1;
+    uint8_t bit_w = (*ptr & 0x1);
+
+    LOG("; [0x%02x] %s Byte - Found MEMORY TO ACCUMULATOR MOV bitstream | W[%d]\n", *ptr, byte_count_str[consumed_bytes], bit_w);
+
+    // consume address_low byte
+    ptr++;
+    consumed_bytes++;
+    address_low = *ptr;
+    LOG("; [0x%02x] %s Byte - address_low[0x%02x]\n", *ptr, byte_count_str[consumed_bytes], address_low);
+    if (bit_w == 1) {
+        // consume address_high byte
+        ptr++;
+        consumed_bytes++;
+        address_high = *ptr;
+        LOG("; [0x%02x] %s Byte - address_high[0x%02x]\n", *ptr, byte_count_str[consumed_bytes], address_high);
+    }
+    address = (address_high << 8) | address_low;
+    LOG("; Address [0x%04x][%d]\n", address, address);
+
+    printf("mov ax, [ %d ]\n", address);
+    fprintf(out_fp, "mov ax, [ %d ]\n", address);
+    return consumed_bytes;
+}
+
+/*
+ * Process a Accumulator to Memory  MOV
+ *
+ * Returns number of bytes where consumed, so the caller
+ * can skip ahead to process the next unprocessed bytes
+ * in the buffer
+ */
+int process_mov_accumulator_to_mem_inst(uint8_t *ptr) {
+    uint8_t address_low = 0;
+    uint8_t address_high = 0;
+    int16_t address = 0;
+    int consumed_bytes = 1;
+    uint8_t bit_w = (*ptr & 0x1);
+
+    LOG("; [0x%02x] %s Byte - Found ACCUMULATOR TO MEMORY MOV bitstream | W[%d]\n", *ptr, byte_count_str[consumed_bytes], bit_w);
+
+    // consume address_low byte
+    ptr++;
+    consumed_bytes++;
+    address_low = *ptr;
+    LOG("; [0x%02x] %s Byte - address_low[0x%02x]\n", *ptr, byte_count_str[consumed_bytes], address_low);
+    if (bit_w == 1) {
+        // consume address_high byte
+        ptr++;
+        consumed_bytes++;
+        address_high = *ptr;
+        LOG("; [0x%02x] %s Byte - address_high[0x%02x]\n", *ptr, byte_count_str[consumed_bytes], address_high);
+    }
+    address = (address_high << 8) | address_low;
+    LOG("; Address [0x%04x][%d]\n", address, address);
+
+    printf("mov [ %d ], ax\n", address);
+    fprintf(out_fp, "mov [ %d ], ax\n", address);
+    return consumed_bytes;
 }
 
 /*
@@ -560,6 +636,12 @@ int main (int argc, char *argv[]) {
             } else if ( (*ptr>>2) == MOV_REGMEM_REG_INSTRUCTION) {
                 // found move register/memory to/from register
                 consumed_bytes = process_mov_regmem_reg_inst(ptr);
+            } else if ((*ptr>>1) == MOV_MEMORY_TO_ACCUMULATOR) {
+                // found memory to accumulator move
+                consumed_bytes = process_mov_mem_to_accumulator_inst(ptr);
+            } else if ((*ptr>>1) == MOV_ACCUMULATOR_TO_MEMORY) {
+                // found memory to accumulator move
+                consumed_bytes = process_mov_accumulator_to_mem_inst(ptr);
             } else {
                 LOG("; [0x%02x] not a recognized instruction, continue search...\n", *ptr);
                 consumed_bytes = 1;
