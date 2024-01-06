@@ -2,10 +2,10 @@
 decoder
 
 # ignore test binaries
-tests/*.bin
+*.bin
 
 # ignore test asm results
-tests/out_*.asm
+out_*.asm
 
 # Prerequisites
 *.d

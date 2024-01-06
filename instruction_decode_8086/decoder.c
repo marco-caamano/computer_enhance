@@ -71,49 +71,13 @@ void usage(void) {
 }
 
 /*
- * Process a Memory to Accumulator MOV
+ * Process a Accumulator MOV
  *
  * Returns number of bytes where consumed, so the caller
  * can skip ahead to process the next unprocessed bytes
  * in the buffer
  */
-int process_mov_mem_to_accumulator_inst(uint8_t *ptr) {
-    uint8_t address_low = 0;
-    uint8_t address_high = 0;
-    int16_t address = 0;
-    int consumed_bytes = 1;
-    uint8_t bit_w = (*ptr & 0x1);
-
-    LOG("; [0x%02x] %s Byte - Found MEMORY TO ACCUMULATOR MOV bitstream | W[%d]\n", *ptr, byte_count_str[consumed_bytes], bit_w);
-
-    // consume address_low byte
-    ptr++;
-    consumed_bytes++;
-    address_low = *ptr;
-    LOG("; [0x%02x] %s Byte - address_low[0x%02x]\n", *ptr, byte_count_str[consumed_bytes], address_low);
-    if (bit_w == 1) {
-        // consume address_high byte
-        ptr++;
-        consumed_bytes++;
-        address_high = *ptr;
-        LOG("; [0x%02x] %s Byte - address_high[0x%02x]\n", *ptr, byte_count_str[consumed_bytes], address_high);
-    }
-    address = (address_high << 8) | address_low;
-    LOG("; Address [0x%04x][%d]\n", address, address);
-
-    printf("mov ax, [ %d ]\n", address);
-    fprintf(out_fp, "mov ax, [ %d ]\n", address);
-    return consumed_bytes;
-}
-
-/*
- * Process a Accumulator to Memory  MOV
- *
- * Returns number of bytes where consumed, so the caller
- * can skip ahead to process the next unprocessed bytes
- * in the buffer
- */
-int process_mov_accumulator_to_mem_inst(uint8_t *ptr) {
+int process_mov_accumulator_inst(uint8_t *ptr, int op_type) {
     uint8_t address_low = 0;
     uint8_t address_high = 0;
     int16_t address = 0;
@@ -137,8 +101,15 @@ int process_mov_accumulator_to_mem_inst(uint8_t *ptr) {
     address = (address_high << 8) | address_low;
     LOG("; Address [0x%04x][%d]\n", address, address);
 
-    printf("mov [ %d ], ax\n", address);
-    fprintf(out_fp, "mov [ %d ], ax\n", address);
+    if (op_type == MOV_MEMORY_TO_ACCUMULATOR) {
+        printf("mov ax, [ %d ]\n", address);
+        fprintf(out_fp, "mov ax, [ %d ]\n", address);
+    } else {
+        // MOV_ACCUMULATOR_TO_MEMORY
+        printf("mov [ %d ], ax\n", address);
+        fprintf(out_fp, "mov [ %d ], ax\n", address);
+    }
+
     return consumed_bytes;
 }
 
@@ -638,10 +609,10 @@ int main (int argc, char *argv[]) {
                 consumed_bytes = process_mov_regmem_reg_inst(ptr);
             } else if ((*ptr>>1) == MOV_MEMORY_TO_ACCUMULATOR) {
                 // found memory to accumulator move
-                consumed_bytes = process_mov_mem_to_accumulator_inst(ptr);
+                consumed_bytes = process_mov_accumulator_inst(ptr, MOV_MEMORY_TO_ACCUMULATOR);
             } else if ((*ptr>>1) == MOV_ACCUMULATOR_TO_MEMORY) {
                 // found memory to accumulator move
-                consumed_bytes = process_mov_accumulator_to_mem_inst(ptr);
+                consumed_bytes = process_mov_accumulator_inst(ptr, MOV_ACCUMULATOR_TO_MEMORY);
             } else {
                 LOG("; [0x%02x] not a recognized instruction, continue search...\n", *ptr);
                 consumed_bytes = 1;
