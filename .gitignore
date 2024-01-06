@@ -1,9 +1,11 @@
-#ignore binary
+# ignore binary
 decoder
 
-#ignore assembler files and binaries
-*.asm
-*.bin
+# ignore test binaries
+tests/*.bin
+
+# ignore test asm results
+tests/out_*.asm
 
 # Prerequisites
 *.d
