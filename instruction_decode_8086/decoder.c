@@ -17,6 +17,8 @@
 
 // mov 100010DW => 10 0010
 #define MOV_REGMEM_REG_INSTRUCTION          0x22
+// mov 1100011W => 110 0011
+#define MOV_IMMEDIATE_TO_REGMEM_INSTRUCTION 0x63
 // mov 1011WREG => 1011
 #define MOV_IMMEDIATE_TO_REG_INSTRUCTION    0xb
 
@@ -46,12 +48,215 @@ char *mov_source_effective_address[] = {
     "BX"
 };
 
+char *byte_count_str[] = {
+    "",
+    "1st",
+    "2nd",
+    "3rd",
+    "4th",
+    "5th",
+    "6th"
+};
+
 void usage(void) {
     fprintf(stderr, "8086 Instruction Decoder Usage:\n");
     fprintf(stderr, "-h         This help dialog.\n");
     fprintf(stderr, "-i <file>  Path to file to parse.\n");
     fprintf(stderr, "-o <file>  Path to file to generate output.\n");
     fprintf(stderr, "-v         Enable verbose output.\n");
+}
+
+/*
+ * Process a MOV immediate to register
+ *
+ * Returns number of bytes where consumed, so the caller
+ * can skip ahead to process the next unprocessed bytes
+ * in the buffer
+ */
+int process_mov_immediate_to_register_memory(uint8_t *ptr) {
+    uint8_t data_low = 0;
+    uint8_t data_high = 0;
+    int16_t data = 0;
+    uint8_t displacement_low = 0;
+    uint8_t displacement_high = 0;
+    int16_t displacement = 0;
+    int consumed_bytes = 1;
+    uint8_t bit_w = *ptr & 0x1;
+    char *data_type = "byte";
+    char *destination = NULL;
+
+    LOG("; [0x%02x] %s Byte - Found IMMEDIATE TO REG/MEM MOV bitstream | W[%d]\n", *ptr, byte_count_str[consumed_bytes], bit_w);
+
+    // consume 2nd byte
+    ptr++;
+    consumed_bytes++;
+    uint8_t mod = (*ptr >> 6) & 0x3;
+    uint8_t r_m = (*ptr >> 0) & 0x7;
+    
+    if (mod == 0x3) {
+        destination = register_map[r_m][bit_w];
+    } else {
+        destination = mov_source_effective_address[r_m];
+    }
+    LOG("; [0x%02x] %s Byte - MOD[0x%x] R/M[0x%x] destination[%s]\n", *ptr, byte_count_str[consumed_bytes], mod, r_m, destination);
+
+    switch (mod) {
+        case 0x0:
+            // Memory Mode, No Displacement
+            // * except when R/M is 110 then 16bit displacement follows
+            if (r_m == 0x6) {
+                // special case R/M is 110
+                // 16 bit displacement follows
+
+                // consume displacement_low byte
+                ptr++;
+                consumed_bytes++;
+                displacement_low = *ptr;
+                LOG("; [0x%02x] %s Byte - Displacement Low[0x%02x] \n", displacement_low, byte_count_str[consumed_bytes], displacement_low);
+                
+                // consume displacement_high byte
+                ptr++;
+                consumed_bytes++;
+                displacement_high = *ptr;
+                displacement = (displacement_high << 8) | displacement_low;
+                LOG("; [0x%02x] %s Byte - Displacement High[0x%02x] | Displacement [0x%04x][%d]\n", *ptr, byte_count_str[consumed_bytes], displacement_high, displacement, displacement);
+            }
+
+            // consume data_low byte
+            ptr++;
+            consumed_bytes++;
+            data_low = *ptr;
+            LOG("; [0x%02x] %s Byte - data_low[0x%02x]\n", *ptr, byte_count_str[consumed_bytes], data_low);
+
+            if (bit_w == 0x1) {
+                // 16 bit data
+                // consume data_high byte
+                data_type = "word";
+                ptr++;
+                consumed_bytes++;
+                data_high = *ptr;
+                LOG("; [0x%02x] %s Byte - data_high[0x%02x]\n", *ptr, byte_count_str[consumed_bytes], data_high);
+            }
+            data = (data_high<<8) | data_low;
+            LOG("; data[0x%04x][%d]\n", data, data);
+            if (displacement == 0) {
+                printf("mov [%s], %s %d\n", destination, data_type, data);
+                fprintf(out_fp, "mov [%s], %s %d\n", destination, data_type, data);
+            } else {
+                printf("mov [%s + %d], %s %d\n", destination, displacement, data_type, data);
+                fprintf(out_fp, "mov [%s + %d], %s %d\n", destination, displacement, data_type, data);
+            }
+            break;
+
+        case 0x1:
+            // Memory Mode, 8bit displacement follows
+            ptr++;
+            consumed_bytes++;
+            // check if we need to do 8bit to 16bit signed extension
+            if ((*ptr>>7) == 0x1 ) {
+                // MSB bit is set, then do signed extension
+                displacement = (0xFF<<8) | *ptr;
+                LOG("; [0x%02x] %s Byte - Displacement[0x%x] signed extended to [%d]\n", *ptr, byte_count_str[consumed_bytes], *ptr, displacement);
+            } else {
+                displacement = *ptr;
+                LOG("; [0x%02x] %s Byte - Displacement[0x%x][%d]\n", *ptr,  byte_count_str[consumed_bytes], displacement, displacement);
+            }
+
+            // consume data_low byte
+            ptr++;
+            consumed_bytes++;
+            data_low = *ptr;
+            LOG("; [0x%02x] %s Byte - data_low[0x%02x]\n", *ptr, byte_count_str[consumed_bytes], data_low);
+
+            if (bit_w == 0x1) {
+                // 16 bit data
+                // consume data_high byte
+                data_type = "word";
+                ptr++;
+                consumed_bytes++;
+                data_high = *ptr;
+                LOG("; [0x%02x] %s Byte - data_high[0x%02x]\n", *ptr, byte_count_str[consumed_bytes], data_high);
+            }
+            data = (data_high<<8) | data_low;
+            LOG("; data[0x%04x][%d]\n", data, data);
+
+            if (displacement == 0) {
+                printf("mov [%s], %s %d\n", destination, data_type, data);
+                fprintf(out_fp, "mov [%s], %s %d\n", destination, data_type, data);
+            } else {
+                printf("mov [%s + %d], %s %d\n", destination, displacement, data_type, data);
+                fprintf(out_fp, "mov [%s + %d], %s %d\n", destination, displacement, data_type, data);
+            }
+            break;
+
+        case 0x2:
+            // Memory Mode, 16bit displacement follows
+
+            // consume displacement_low byte
+            ptr++;
+            consumed_bytes++;
+            displacement_low = *ptr;
+            LOG("; [0x%02x] %s Byte - Displacement Low[0x%02x] \n", displacement_low, byte_count_str[consumed_bytes], displacement_low);
+            
+            // consume displacement_high byte
+            ptr++;
+            consumed_bytes++;
+            displacement_high = *ptr;
+            displacement = (displacement_high << 8) | displacement_low;
+            LOG("; [0x%02x] %s Byte - Displacement High[0x%02x] | Displacement [0x%04x][%d]\n", *ptr, byte_count_str[consumed_bytes], displacement_high, displacement, displacement);
+
+            // consume data_low byte
+            ptr++;
+            consumed_bytes++;
+            data_low = *ptr;
+            LOG("; [0x%02x] %s Byte - data_low[0x%02x]\n", *ptr, byte_count_str[consumed_bytes], data_low);
+
+            if (bit_w == 0x1) {
+                // 16 bit data
+                // consume data_high byte
+                data_type = "word";
+                ptr++;
+                consumed_bytes++;
+                data_high = *ptr;
+                LOG("; [0x%02x] %s Byte - data_high[0x%02x]\n", *ptr, byte_count_str[consumed_bytes], data_high);
+            }
+            data = (data_high<<8) | data_low;
+            LOG("; data[0x%04x][%d]\n", data, data);
+
+            if (displacement == 0) {
+                printf("mov [%s], %s %d\n", destination, data_type, data);
+                fprintf(out_fp, "mov [%s], %s %d\n", destination, data_type, data);
+            } else {
+                printf("mov [%s + %d], %s %d\n", destination, displacement, data_type, data);
+                fprintf(out_fp, "mov [%s + %d], %s %d\n", destination, displacement, data_type, data);
+            }
+            break;
+
+        case 0x3:
+            // Register Mode, No Displacement
+            // consume data_low byte
+            ptr++;
+            consumed_bytes++;
+            data_low = *ptr;
+            LOG("; [0x%02x] %s Byte - data_low[0x%02x]\n", *ptr, byte_count_str[consumed_bytes], data_low);
+
+            if (bit_w == 0x1) {
+                // 16 bit data
+                // consume data_high byte
+                data_type = "word";
+                ptr++;
+                consumed_bytes++;
+                data_high = *ptr;
+                LOG("; [0x%02x] %s Byte - data_high[0x%02x]\n", *ptr, byte_count_str[consumed_bytes], data_high);
+            }
+            data = (data_high<<8) | data_low;
+            LOG("; data[0x%04x][%d]\n", data, data);
+            printf("mov [%s], %s %d\n", destination, data_type, data);
+            fprintf(out_fp, "mov [%s], %s %d\n", destination, data_type, data);
+            break;
+    }
+
+    return consumed_bytes;
 }
 
 /*
@@ -69,7 +274,7 @@ int process_mov_immediate_to_register(uint8_t *ptr) {
     uint8_t bit_w = (*ptr>>3) & 0x1;
     uint8_t reg = (*ptr & 0x7);
     char *reg_str = register_map[reg][bit_w];
-    LOG("; [0x%x] Found IMMEDIATE TO REG MOV bitstream | W[%d] REG[0x%x][%s] | ", *ptr, bit_w, reg, reg_str);
+    LOG("; [0x%02x] Found IMMEDIATE TO REG MOV bitstream | W[%d] REG[0x%x][%s] | ", *ptr, bit_w, reg, reg_str);
     // consume 2nd byte
     ptr++;
     consumed_bytes++;
@@ -107,14 +312,14 @@ int process_mov_regmem_reg_inst(uint8_t *ptr) {
     char *destination = NULL;
     char *source = NULL;
     int consumed_bytes = 1;
-    LOG("; [0x%x] Found REG/MEM TO/FROM REGISTER MOV bitstream | D[%d] W[%d]\n", *ptr, bit_d, bit_w);
+    LOG("; [0x%02x] Found REG/MEM TO/FROM REGISTER MOV bitstream | D[%d] W[%d]\n", *ptr, bit_d, bit_w);
     // consume 2nd byte
     ptr++;
     uint8_t mod = (*ptr >> 6) & 0x3;
     uint8_t reg = (*ptr >> 3) & 0x7;
     uint8_t r_m = (*ptr >> 0) & 0x7;
     consumed_bytes++;
-    LOG("; [0x%x] 2nd Byte - MOD[0x%x] REG[0x%x] R/M[0x%x]\n", *ptr, mod, reg, r_m);
+    LOG("; [0x%02x] 2nd Byte - MOD[0x%x] REG[0x%x] R/M[0x%x]\n", *ptr, mod, reg, r_m);
     switch (mod) {
         case 0x0:
             // Memory Mode, No Displacement
@@ -124,10 +329,10 @@ int process_mov_regmem_reg_inst(uint8_t *ptr) {
                 // 16 bit displacement follows
                 ptr++;
                 data_low = *ptr;
-                LOG("; [0x%x] 3rd Byte - Data Low[0x%02x] \n", data_low, data_low);
+                LOG("; [0x%02x] 3rd Byte - Data Low[0x%02x] \n", data_low, data_low);
                 ptr++;
                 data_high = *ptr;
-                LOG("; [0x%x] 4th Byte - Data High[0x%02x] | ", data_high, data_high);
+                LOG("; [0x%02x] 4th Byte - Data High[0x%02x] | ", data_high, data_high);
                 data = (data_high << 8) | data_low;
                 LOG(" Data [0x%04x][%d]\n", data, data);
                 consumed_bytes+=2;
@@ -162,10 +367,10 @@ int process_mov_regmem_reg_inst(uint8_t *ptr) {
             if ((*ptr>>7) == 0x1 ) {
                 // MSB bit is set, then do signed extension
                 data = (0xFF<<8) | *ptr;
-                LOG("; [0x%x] 3rd Byte - Data[0x%x] signed extended to [%d]\n", *ptr, *ptr, data);
+                LOG("; [0x%02x] 3rd Byte - Data[0x%x] signed extended to [%d]\n", *ptr, *ptr, data);
             } else {
                 data = *ptr;
-                LOG("; [0x%x] 3rd Byte - Data[0x%x][%d]\n", data, data, data);
+                LOG("; [0x%02x] 3rd Byte - Data[0x%x][%d]\n", data, data, data);
             }
             if (bit_d == 0x1) {
                 // destination specificed in REG field
@@ -199,10 +404,10 @@ int process_mov_regmem_reg_inst(uint8_t *ptr) {
             // Memory Mode, 16bit displacement follows
             ptr++;
             data_low = *ptr;
-            LOG("; [0x%x] 3rd Byte - Data Low[0x%02x] \n ", data_low, data_low);
+            LOG("; [0x%02x] 3rd Byte - Data Low[0x%02x] \n", data_low, data_low);
             ptr++;
             data_high = *ptr;
-            LOG(" [0x%x] 4th Byte - Data High[0x%02x] | ", data_high, data_high);
+            LOG("; [0x%x] 4th Byte - Data High[0x%02x] |", data_high, data_high);
             data = (data_high << 8) | data_low;
             LOG(" Data [0x%04x][%d]\n", data, data);
             consumed_bytes+=2;
@@ -346,14 +551,17 @@ int main (int argc, char *argv[]) {
         // so we inspect on a per byte basis
         while (bytes_available>0) {
             int consumed_bytes = 0;
-            if ((*ptr>>4) == MOV_IMMEDIATE_TO_REG_INSTRUCTION) {
+            if ((*ptr>>1) == MOV_IMMEDIATE_TO_REGMEM_INSTRUCTION) {
+                // found immediate to register/memory
+                consumed_bytes = process_mov_immediate_to_register_memory(ptr);
+            } else if ((*ptr>>4) == MOV_IMMEDIATE_TO_REG_INSTRUCTION) {
                 // found immediate to register move
                 consumed_bytes = process_mov_immediate_to_register(ptr);
             } else if ( (*ptr>>2) == MOV_REGMEM_REG_INSTRUCTION) {
                 // found move register/memory to/from register
                 consumed_bytes = process_mov_regmem_reg_inst(ptr);
             } else {
-                LOG("; [0x%x] not a recognized instruction, continue search...\n", *ptr);
+                LOG("; [0x%02x] not a recognized instruction, continue search...\n", *ptr);
                 consumed_bytes = 1;
             }
             LOG("\n");
