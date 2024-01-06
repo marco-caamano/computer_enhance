@@ -23,36 +23,40 @@ fi
 
 cd tests || { echo "Failed to cd into tests"; exit 1; }
 for test_file in `ls listing*.asm`; do 
-    echo "--------------------------------------------------------"
-    echo "Processing Listing $test_file"
-    echo "    Generating $test_file Assembly"
+    echo "##--------------------------------------------------------"
+    echo "## Processing Listing $test_file"
+    echo "##     Generating $test_file Assembly"
     nasm $test_file -o $test_file.bin
     if [ $? -ne 0 ] ; then
-        echo "ERROR: Failed to Generate assembly[$test_file], skipping to next file"
-        continue
+        echo "## ERROR: Failed to Generate assembly[$test_file]"
+        exit 1
     fi
-    echo "    Decoding $test_file.bin File"
-    ../decoder -i $test_file.bin -o out_$test_file.asm >> /dev/null
+    echo "##     Decoding $test_file.bin File"
+    ../decoder -i $test_file.bin -o out_$test_file.asm 
     if [ $? -ne 0 ] ; then
-        echo "ERROR: Failed to decode assembly[$test_file.bin], skipping to next file"
-        continue
+        echo "## ERROR: Failed to decode assembly[$test_file.bin]"
+        exit 1
     fi
-    echo "    Generating Assembly of Decoded File"
+    echo "##     Generating Assembly of Decoded File"
     nasm out_$test_file.asm -o out_$test_file.bin
     if [ $? -ne 0 ] ; then
-        echo "ERROR: Failed to Generate assembly of decoded file[out_$test_file.asm], skipping to next file"
-        continue
+        echo "## ERROR: Failed to Generate assembly of decoded file[out_$test_file.asm]"
+        exit 1
     fi
-    echo "    Compare Binaries"
+    echo "##     Compare Binaries"
     cmp -s $test_file.bin out_$test_file.bin
     if [ $? -ne 0 ] ; then
-        echo "ERROR: Binaries Do Not Match for $test_file, skipping to next file"
-        echo "----[$test_file] Test Failed"
-        continue
+        echo "## ERROR: Binaries Do Not Match for $test_file"
+        echo "## ----[$test_file] Test Failed"
+        exit 1
     fi
-    echo "OK - Successful decoder of $test_file"
-    echo "--------------------------------------------------------"
+    echo "## OK - Successful decoder of $test_file"
+    echo "##--------------------------------------------------------"
     echo
 done
 
-
+echo 
+echo "##"
+echo "## All Tests Passed OK"
+echo "##"
+echo
