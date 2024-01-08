@@ -57,6 +57,49 @@
 // cmp 0011110W => 001 1110
 #define CMP_IMMEDIATE_WITH_ACCUMULATOR      0x1e
 
+// jnz 01110101 => 0111 0101
+#define JNZ_OP                              0x75
+// je 01110100 => 0111 0100
+#define JE_OP                               0x74
+// jl 01111100 => 0111 1100
+#define JL_OP                               0x7c
+// jle 01111110 => 0111 1110
+#define JLE_OP                              0x7e
+// jb 01110010 => 0111 0010
+#define JB_OP                               0x72
+// jbe 01110110 => 0111 0110
+#define JBE_OP                              0x76
+// jp 01111010 => 0111 1010
+#define JP_OP                               0x7a
+// jo 01110000 => 0111 0000
+#define JO_OP                               0x70
+// js 01111000 => 0111 1000
+#define JS_OP                               0x78
+// jnl 01111101 => 0111 1101
+#define JNL_OP                              0x7d
+// jg 01111111 => 0111 1111
+#define JG_OP                               0x7f
+// jnb 01110011 => 0111 0011
+#define JNB_OP                              0x73
+// ja 01110111 => 0111 0111
+#define JA_OP                               0x77
+// jnp 01111011 => 0111 1011
+#define JNP_OP                              0x7b
+// jno 01110001 => 0111 0001
+#define JNO_OP                              0x71
+// jns 01111001 => 0111 1001
+#define JNS_OP                              0x79
+
+// loop 11100010 => 1110 0010
+#define LOOP_OP                             0xe2
+// loopz 11100010 => 1110 0001
+#define LOOPZ_OP                            0xe1
+// loopnz 11100010 => 1110 0000
+#define LOOPNZ_OP                           0xe0
+// jcxz 11100011 => 1110 0011
+#define JCXZ_OP                             0xe3
+
+
 bool verbose = false;
 FILE *in_fp = NULL;
 FILE *out_fp = NULL;
@@ -821,6 +864,118 @@ int process_immediate_accumulator_op_inst(uint8_t *ptr, int op_type) {
     return consumed_bytes;
 }
 
+/*
+ * Process a Immediate to Accumulator OP
+ *
+ * Returns number of bytes consumed, so the caller
+ * can skip ahead to process the next unprocessed bytes
+ * in the buffer
+ */
+int process_jump_op_inst(uint8_t *ptr, int op_type) {
+    int16_t data = 0;
+    int consumed = 0;
+    int consumed_bytes = 1;
+    uint8_t bit_w = (*ptr & 0x1);
+    char *op_type_str = NULL;
+    char *op = NULL;
+
+    switch (op_type) {
+        case JNZ_OP:
+            op_type_str = "JNZ_OP";
+            op = "jnz";
+            break;
+        case JE_OP:
+            op_type_str = "JE_OP";
+            op = "je";
+            break;
+        case JL_OP:
+            op_type_str = "JL_OP";
+            op = "jl";
+            break;
+        case JLE_OP:
+            op_type_str = "JLE_OP";
+            op = "jle";
+            break;
+        case JB_OP:
+            op_type_str = "JB_OP";
+            op = "jb";
+            break;
+        case JBE_OP:
+            op_type_str = "JBE_OP";
+            op = "jbe";
+            break;
+        case JP_OP:
+            op_type_str = "JP_OP";
+            op = "jp";
+            break;
+        case JO_OP:
+            op_type_str = "JO_OP";
+            op = "jo";
+            break;
+        case JS_OP:
+            op_type_str = "JS_OP";
+            op = "js";
+            break;
+        case JNL_OP:
+            op_type_str = "JNL_OP";
+            op = "jnl";
+            break;
+        case JG_OP:
+            op_type_str = "JG_OP";
+            op = "jg";
+            break;
+        case JNB_OP:
+            op_type_str = "JNB_OP";
+            op = "jnb";
+            break;
+        case JA_OP:
+            op_type_str = "JA_OP";
+            op = "ja";
+            break;
+        case JNP_OP:
+            op_type_str = "JNP_OP";
+            op = "jnp";
+            break;
+        case JNO_OP:
+            op_type_str = "JNO_OP";
+            op = "jno";
+            break;
+        case JNS_OP:
+            op_type_str = "JNS_OP";
+            op = "jns";
+            break;
+        case LOOP_OP:
+            op_type_str = "LOOP_OP";
+            op = "loop";
+            break;
+        case LOOPZ_OP:
+            op_type_str = "LOOPZ_OP";
+            op = "loopz";
+            break;
+        case LOOPNZ_OP:
+            op_type_str = "LOOPNZ_OP";
+            op = "loopnz";
+            break;
+        case JCXZ_OP:
+            op_type_str = "JCXZ_OP";
+            op = "jcxz";
+            break;
+        default:
+            ERROR("[%s:%d] ERROR: Bad OP[0x%x]\n", __FUNCTION__, __LINE__, op_type);
+    }
+    LOG("; [0x%02x] %s Byte - Found %s bitstream | W[%d]\n", *ptr, byte_count_str[consumed_bytes], op_type_str, bit_w);
+
+    // extract data
+    consumed = extract_data(ptr, 0, &data, consumed_bytes);
+    consumed_bytes += consumed;
+    ptr += consumed;
+
+    OUTPUT("%s %d\n", op, data);
+
+    return consumed_bytes;
+}
+
+
 int main (int argc, char *argv[]) {
     int opt;
     char *input_file = NULL;
@@ -953,6 +1108,47 @@ int main (int argc, char *argv[]) {
             } else if ((*ptr>>1) == CMP_IMMEDIATE_WITH_ACCUMULATOR) {
                 // found reg/memory with register sub
                 consumed_bytes = process_immediate_accumulator_op_inst(ptr, CMP_IMMEDIATE_WITH_ACCUMULATOR);
+
+            } else if (*ptr == JNZ_OP) {
+                consumed_bytes = process_jump_op_inst(ptr, JNZ_OP);
+            } else if (*ptr == JE_OP) {
+                consumed_bytes = process_jump_op_inst(ptr, JE_OP);
+            } else if (*ptr == JL_OP) {
+                consumed_bytes = process_jump_op_inst(ptr, JL_OP);
+            } else if (*ptr == JLE_OP) {
+                consumed_bytes = process_jump_op_inst(ptr, JLE_OP);
+            } else if (*ptr == JB_OP) {
+                consumed_bytes = process_jump_op_inst(ptr, JB_OP);
+            } else if (*ptr == JBE_OP) {
+                consumed_bytes = process_jump_op_inst(ptr, JBE_OP);
+            } else if (*ptr == JP_OP) {
+                consumed_bytes = process_jump_op_inst(ptr, JP_OP);
+            } else if (*ptr == JO_OP) {
+                consumed_bytes = process_jump_op_inst(ptr, JO_OP);
+            } else if (*ptr == JS_OP) {
+                consumed_bytes = process_jump_op_inst(ptr, JS_OP);
+            } else if (*ptr == JNL_OP) {
+                consumed_bytes = process_jump_op_inst(ptr, JNL_OP);
+            } else if (*ptr == JG_OP) {
+                consumed_bytes = process_jump_op_inst(ptr, JG_OP);
+            } else if (*ptr == JNB_OP) {
+                consumed_bytes = process_jump_op_inst(ptr, JNB_OP);
+            } else if (*ptr == JA_OP) {
+                consumed_bytes = process_jump_op_inst(ptr, JA_OP);
+            } else if (*ptr == JNP_OP) {
+                consumed_bytes = process_jump_op_inst(ptr, JNP_OP);
+            } else if (*ptr == JNO_OP) {
+                consumed_bytes = process_jump_op_inst(ptr, JNO_OP);
+            } else if (*ptr == JNS_OP) {
+                consumed_bytes = process_jump_op_inst(ptr, JNS_OP);
+            } else if (*ptr == LOOP_OP) {
+                consumed_bytes = process_jump_op_inst(ptr, LOOP_OP);
+            } else if (*ptr == LOOPZ_OP) {
+                consumed_bytes = process_jump_op_inst(ptr, LOOPZ_OP);
+            } else if (*ptr == LOOPNZ_OP) {
+                consumed_bytes = process_jump_op_inst(ptr, LOOPNZ_OP);
+            } else if (*ptr == JCXZ_OP) {
+                consumed_bytes = process_jump_op_inst(ptr, JCXZ_OP);
             } else {
                 ERROR("; [0x%02x] not a recognized instruction, aborting...\n", *ptr);
             }
