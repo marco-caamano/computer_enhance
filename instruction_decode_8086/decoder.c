@@ -13,6 +13,16 @@
         }                           \
     }
 
+#define ERROR(...) {                    \
+        fprintf(stderr, __VA_ARGS__);   \
+        exit(1);                        \
+    }
+
+#define OUTPUT(...) {               \
+    printf(__VA_ARGS__);            \
+    fprintf(out_fp, __VA_ARGS__);   \
+}
+
 #define BUFFER_SIZE 4096
 
 // mov 100010DW => 10 0010
@@ -20,36 +30,57 @@
 // mov 1100011W => 110 0011
 #define MOV_IMMEDIATE_TO_REGMEM_INSTRUCTION 0x63
 // mov 1011WREG => 1011
-#define MOV_IMMEDIATE_TO_REG_INSTRUCTION    0xb
+#define MOV_IMMEDIATE_TO_REG_INSTRUCTION    0x0b
 // mov 1010000W => 101 0000
 #define MOV_MEMORY_TO_ACCUMULATOR           0x50
 // mov 1010001W => 101 0001
 #define MOV_ACCUMULATOR_TO_MEMORY           0x51
+
+// add 000000DW => 00 0000
+#define ADD_REGMEM_WITH_REG                 0x00
+// add 100000SW => 10 0000
+#define ADD_IMMEDIATE_TO_REGMEM             0x20
+// add 0000010W => 000 0010
+#define ADD_IMMEDIATE_TO_ACCUMULATOR        0x02
+
+// sub 001010DW => 00 1010
+#define SUB_REGMEM_WITH_REG                 0x0a
+// sub 100000SW => 10 0000
+#define SUB_IMMEDIATE_TO_REGMEM             ADD_IMMEDIATE_TO_REGMEM
+// sub 0010110W =>  001 0110
+#define SUB_IMMEDIATE_FROM_ACCUMULATOR      0x16
+
+// cmp 001110DW => 00 1110
+#define CMP_REGMEM_WITH_REG                 0x0e
+// cmp 100000SW => 10 0000
+#define CMP_IMMEDIATE_TO_REGMEM             ADD_IMMEDIATE_TO_REGMEM
+// cmp 0011110W => 001 1110
+#define CMP_IMMEDIATE_WITH_ACCUMULATOR      0x1e
 
 bool verbose = false;
 FILE *in_fp = NULL;
 FILE *out_fp = NULL;
 
 char *register_map[8][2] = {
-    { "AL", "AX" }, 
-    { "CL", "CX" }, 
-    { "DL", "DX" }, 
-    { "BL", "BX" }, 
-    { "AH", "SP" }, 
-    { "CH", "BP" }, 
-    { "DH", "SI" }, 
-    { "BH", "DI" }
+    { "al", "ax" }, 
+    { "cl", "cx" }, 
+    { "dl", "dx" }, 
+    { "bl", "bx" }, 
+    { "ah", "sp" }, 
+    { "ch", "bp" }, 
+    { "dh", "si" }, 
+    { "bh", "di" }
 };
 
 char *mov_source_effective_address[] = {
-    "BX + SI",
-    "BX + DI",
-    "BP + SI",
-    "BP + DI",
-    "SI",
-    "DI",
-    "BP",
-    "BX"
+    "bx + si",
+    "bx + di",
+    "bp + si",
+    "bp + di",
+    "si",
+    "di",
+    "bp",
+    "bx"
 };
 
 char *byte_count_str[] = {
@@ -156,6 +187,67 @@ int extract_data(uint8_t *ptr, int bit_w, int16_t *data, int prev_consumed_bytes
         LOG(";        Data [0x%04x][%d]\n", *data, *data);
     }
 
+    return consumed_bytes;
+}
+
+
+/*
+ * Extract Displacement from bitstream
+ *
+ * Returns number of bytes consumed, so the caller
+ * can skip ahead to process the next unprocessed bytes
+ * in the buffer
+ */
+int explicit_extract_data(uint8_t *ptr, int bit_s, int bit_w, int16_t *data, int prev_consumed_bytes) {
+    int consumed_bytes = 0;
+    uint8_t op = (bit_s<<1) | bit_w;
+    uint8_t data_low = 0;
+    uint8_t data_high = 0;
+
+    // consume data_low byte
+    ptr++;
+    consumed_bytes++;
+    prev_consumed_bytes++;
+    data_low = *ptr;
+
+    // Explicit Extact of Data according to bits S and W
+    // s w
+    // 0 0  8 bit no sign extension
+    // 0 1  16 bit data
+    // 1 0  sign extend to 16 bit
+    // 1 1  sign extend to 16 bit
+    switch (op) {
+        case 0x0:
+            // 8 bit no sign extension
+            *data = *ptr;
+            LOG("; [0x%02x] %s Byte - Data[0x%x][%d]\n", *ptr,  byte_count_str[prev_consumed_bytes], *data, *data);
+            break;
+        case 0x1:
+            // 16 bit data
+            LOG("; [0x%02x] %s Byte - data_low[0x%02x] \n", *ptr, byte_count_str[prev_consumed_bytes], data_low);
+            // consume data_high byte
+            ptr++;
+            consumed_bytes++;
+            prev_consumed_bytes++;
+            data_high = *ptr;
+            LOG("; [0x%02x] %s Byte - data_high[0x%02x]\n", *ptr, byte_count_str[prev_consumed_bytes], data_high);
+            *data = (data_high << 8) | data_low;
+            LOG(";        Data [0x%04x][%d]\n", *data, *data);
+            break;
+        case 0x2:
+        case 0x3:
+            // sign extend to 16 bit
+            // 8 bit data check if we need to do 8bit to 16bit signed extension
+            if ((*ptr>>7) == 0x1 ) {
+                // MSB bit is set, then do signed extension
+                *data = (0xFF<<8) | *ptr;
+                LOG("; [0x%02x] %s Byte - Data[0x%x] signed extended to [%d]\n", *ptr, byte_count_str[prev_consumed_bytes], *ptr, *data);
+            } else {
+                *data = *ptr;
+                LOG("; [0x%02x] %s Byte - Data[0x%x][%d]\n", *ptr,  byte_count_str[prev_consumed_bytes], *data, *data);
+            }
+            break;
+    }
     return consumed_bytes;
 }
 
@@ -368,7 +460,7 @@ int process_mov_immediate_to_register(uint8_t *ptr) {
  * can skip ahead to process the next unprocessed bytes
  * in the buffer
  */
-int process_mov_regmem_reg_inst(uint8_t *ptr) {
+int process_regmem_tpo_reg_op_inst(uint8_t *ptr, int op_type) {
     uint8_t bit_d = (*ptr & 0x2)>>1;
     uint8_t bit_w = *ptr & 0x1;
     char *destination = NULL;
@@ -376,8 +468,31 @@ int process_mov_regmem_reg_inst(uint8_t *ptr) {
     int consumed = 0;
     int consumed_bytes = 1;
     int16_t displacement = 0;
+    char *op_type_str = NULL;
+    char *op = NULL;
 
-    LOG("; [0x%02x] %s Byte - Found REG/MEM TO/FROM REGISTER MOV bitstream | D[%d] W[%d]\n", *ptr, byte_count_str[consumed_bytes], bit_d, bit_w);
+    switch (op_type) {
+        case MOV_REGMEM_REG_INSTRUCTION:
+            op_type_str = "MOV_REGMEM_REG_INSTRUCTION";
+            op = "mov";
+            break;
+        case ADD_REGMEM_WITH_REG:
+            op_type_str = "ADD_REGMEM_WITH_REG";
+            op = "add";
+            break;
+        case SUB_REGMEM_WITH_REG:
+            op_type_str = "SUB_REGMEM_WITH_REG";
+            op = "sub";
+            break;
+        case CMP_REGMEM_WITH_REG:
+            op_type_str = "CMP_REGMEM_WITH_REG";
+            op = "cmp";
+            break;
+        default:
+            ERROR("[%s:%d] ERROR: Bad OP[0x%x]\n", __FUNCTION__, __LINE__, op_type);
+    }
+
+    LOG("; [0x%02x] %s Byte - Found %s bitstream | D[%d] W[%d]\n", *ptr, byte_count_str[consumed_bytes], op_type_str, bit_d, bit_w);
 
     // consume 2nd byte
     ptr++;
@@ -401,23 +516,23 @@ int process_mov_regmem_reg_inst(uint8_t *ptr) {
                 // destination specificed in REG field
                 destination = register_map[reg][bit_w];
                 // source is the direct address
-                printf("mov %s, [%d]\n", destination, displacement);
-                fprintf(out_fp, "mov %s, [%d]\n", destination, displacement);
+                printf("%s %s, [%d]\n", op, destination, displacement);
+                fprintf(out_fp, "%s %s, [%d]\n", op, destination, displacement);
             } else {
                 if (bit_d == 0x1) {
                     // destination specificed in REG field
                     destination = register_map[reg][bit_w];
                     // source specified in effective address table
                     source = mov_source_effective_address[r_m];
-                    printf("mov %s, [%s]\n", destination, source);
-                    fprintf(out_fp, "mov %s, [%s]\n", destination, source);
+                    printf("%s %s, [%s]\n", op, destination, source);
+                    fprintf(out_fp, "%s %s, [%s]\n", op, destination, source);
                 } else {
                     // destination specificed in R/M field
                     destination = mov_source_effective_address[r_m];
                     // source specified in REG field
                     source = register_map[reg][bit_w];
-                    printf("mov [%s], %s\n", destination, source);
-                    fprintf(out_fp, "mov [%s], %s\n", destination, source);
+                    printf("%s [%s], %s\n", op, destination, source);
+                    fprintf(out_fp, "%s [%s], %s\n", op, destination, source);
                 }
             }
             break;
@@ -435,11 +550,11 @@ int process_mov_regmem_reg_inst(uint8_t *ptr) {
                 source = mov_source_effective_address[r_m];
                 if (displacement==0) {
                     // don't output " + 0" in the effective address calculation
-                    printf("mov %s, [%s]\n", destination, source);
-                    fprintf(out_fp, "mov %s, [%s]\n", destination, source);
+                    printf("%s %s, [%s]\n", op, destination, source);
+                    fprintf(out_fp, "%s %s, [%s]\n", op, destination, source);
                 } else {
-                    printf("mov %s, [%s + %d]\n", destination, source, displacement);
-                    fprintf(out_fp, "mov %s, [%s + %d]\n", destination, source, displacement);
+                    printf("%s %s, [%s + %d]\n", op, destination, source, displacement);
+                    fprintf(out_fp, "%s %s, [%s + %d]\n", op, destination, source, displacement);
                 }
             } else {
                 // destination specificed in R/M field
@@ -448,11 +563,11 @@ int process_mov_regmem_reg_inst(uint8_t *ptr) {
                 source = register_map[reg][bit_w];
                 if (displacement==0) {
                     // don't output " + 0" in the effective address calculation
-                    printf("mov [%s], %s\n", destination, source);
-                    fprintf(out_fp, "mov [%s], %s\n", destination, source);
+                    printf("%s [%s], %s\n", op, destination, source);
+                    fprintf(out_fp, "%s [%s], %s\n", op, destination, source);
                 } else {
-                    printf("mov [%s + %d], %s\n", destination, displacement, source);
-                    fprintf(out_fp, "mov [%s + %d], %s\n", destination,  displacement, source);
+                    printf("%s [%s + %d], %s\n", op, destination, displacement, source);
+                    fprintf(out_fp, "%s [%s + %d], %s\n", op, destination,  displacement, source);
                 }
             }
             break;
@@ -470,11 +585,11 @@ int process_mov_regmem_reg_inst(uint8_t *ptr) {
                 source = mov_source_effective_address[r_m];
                 if (displacement==0) {
                     // don't output " + 0" in the effective address calculation
-                    printf("mov %s, [%s]\n", destination, source);
-                    fprintf(out_fp, "mov %s, [%s]\n", destination, source);
+                    printf("%s %s, [%s]\n", op, destination, source);
+                    fprintf(out_fp, "%s %s, [%s]\n", op, destination, source);
                 } else {
-                    printf("mov %s, [%s + %d]\n", destination, source, displacement);
-                    fprintf(out_fp, "mov %s, [%s + %d]\n", destination, source, displacement);
+                    printf("%s %s, [%s + %d]\n", op, destination, source, displacement);
+                    fprintf(out_fp, "%s %s, [%s + %d]\n", op, destination, source, displacement);
                 }
             } else {
                 // destination specificed in R/M field
@@ -483,11 +598,11 @@ int process_mov_regmem_reg_inst(uint8_t *ptr) {
                 source = register_map[reg][bit_w];
                 if (displacement==0) {
                     // don't output " + 0" in the effective address calculation
-                    printf("mov [%s], %s\n", destination, source);
-                    fprintf(out_fp, "mov [%s], %s\n", destination, source);
+                    printf("%s [%s], %s\n", op, destination, source);
+                    fprintf(out_fp, "%s [%s], %s\n", op, destination, source);
                 } else {
-                    printf("mov [%s + %d], %s\n", destination, displacement, source);
-                    fprintf(out_fp, "mov [%s + %d], %s\n", destination,  displacement, source);
+                    printf("%s [%s + %d], %s\n", op, destination, displacement, source);
+                    fprintf(out_fp, "%s [%s + %d], %s\n", op, destination,  displacement, source);
                 }
             }
             break;
@@ -505,10 +620,204 @@ int process_mov_regmem_reg_inst(uint8_t *ptr) {
                 // source specificed in REG field
                 source = register_map[reg][bit_w];
             }
-            printf("mov %s,%s\n", destination, source);
-            fprintf(out_fp, "mov %s,%s\n", destination, source);
+            printf("%s %s,%s\n", op, destination, source);
+            fprintf(out_fp, "%s %s,%s\n", op, destination, source);
             break;
     }
+    return consumed_bytes;
+}
+
+
+/*
+ * Process an immediate to register/mem op
+ *
+ * Returns number of bytes consumed, so the caller
+ * can skip ahead to process the next unprocessed bytes
+ * in the buffer
+ */
+int process_immediate_to_regmem_op_inst(uint8_t *ptr, int op_type) {
+    int16_t data = 0;
+    int16_t displacement = 0;
+    int consumed = 0;
+    int consumed_bytes = 1;
+    uint8_t bit_s = (*ptr>>1) & 0x1;
+    uint8_t bit_w = *ptr & 0x1;
+    char *destination = NULL;
+    char *op = NULL;
+    char *data_type = "byte";
+
+    // OP codes for 
+    // ADD_IMMEDIATE_TO_REGMEM
+    // SUB_IMMEDIATE_TO_REGMEM
+    // CMP_IMMEDIATE_TO_REGMEM
+    // are re the same, must differentiate using bits 5-3 from 2nd byte
+
+    LOG("; [0x%02x] %s Byte - Found ADD_IMMEDIATE_TO_REGMEM / SUB_IMMEDIATE_TO_REGMEM / CMP_IMMEDIATE_TO_REGMEM bitstream | S[%d] W[%d]\n", *ptr, byte_count_str[consumed_bytes], bit_s, bit_w);
+
+    // consume 2nd byte
+    ptr++;
+    consumed_bytes++;
+    uint8_t mod = (*ptr >> 6) & 0x3;
+    uint8_t op_sel = (*ptr >> 3) & 0x7;
+    uint8_t r_m = (*ptr >> 0) & 0x7;
+    LOG("; data[0x%x] MOD[0x%x] OP_SEL[0x%x] R/M[0x%x]\n", *ptr, mod, op_sel, r_m);
+
+    if (op_sel == 0x0) {
+        // ADD_IMMEDIATE_TO_REGMEM
+        op = "add";
+    } else if (op_sel == 0x5) {
+        // SUB_IMMEDIATE_TO_REGMEM
+        op = "sub";
+    } else if (op_sel == 0x7) {
+        // CMP_IMMEDIATE_TO_REGMEM
+        op = "cmp";
+    } else {
+        ERROR("; [%s:%d] ERROR: Bad OP Sel encoding found[0x%x]\n", __FUNCTION__, __LINE__, op_sel);
+    }
+    
+    if (mod == 0x3) {
+        destination = register_map[r_m][bit_w];
+    } else {
+        destination = mov_source_effective_address[r_m];
+    }
+    LOG("; [0x%02x] %s Byte - MOD[0x%x] R/M[0x%x] destination[%s]\n", *ptr, byte_count_str[consumed_bytes], mod, r_m, destination);
+
+    if (bit_w == 0x1) {
+        data_type = "word";
+    }
+
+    // s w
+    // 0 0  8bit no sign extension
+    // 0 1  16bit data
+    // 1 0  sign extend 8 bit
+    // 1 1  sign extend to 16 bit
+
+    switch (mod) {
+        case 0x0:
+            // Memory Mode, No Displacement
+            // * except when R/M is 110 then 16bit displacement follows
+            if (r_m == 0x6) {
+                // special case R/M is 110
+                // 16 bit displacement follows
+                consumed = extract_displacement(ptr, bit_w, &displacement, consumed_bytes);
+                consumed_bytes += consumed;
+                ptr += consumed;
+            }
+
+            // extract data
+            consumed = explicit_extract_data(ptr, bit_s, bit_w, &data, consumed_bytes);
+            consumed_bytes += consumed;
+            ptr += consumed;
+
+            if (r_m == 0x6) {
+                // Direct Address
+                OUTPUT("%s %s [%d], %d\n", op, data_type, displacement, data);
+            } else {
+                OUTPUT("%s %s [%s], %d\n", op, data_type, destination, data);
+            }
+            break;
+
+        case 0x1:
+            // Memory Mode, 8bit displacement follows
+
+            // extract displacement
+            consumed = extract_displacement(ptr, bit_w, &displacement, consumed_bytes);
+            consumed_bytes += consumed;
+            ptr += consumed;
+
+            // extract data
+            consumed = explicit_extract_data(ptr, bit_s, bit_w, &data, consumed_bytes);
+            consumed_bytes += consumed;
+            ptr += consumed;
+
+            if (displacement == 0) {
+                OUTPUT("%s %s [%s], %d\n", op, data_type, destination, data);
+            } else {
+                OUTPUT("%s %s [%s + %d], %d\n", op, data_type, destination, displacement, data);
+            }
+            break;
+
+        case 0x2:
+            // Memory Mode, 16bit displacement follows
+
+            // extract displacement
+            consumed = extract_displacement(ptr, bit_w, &displacement, consumed_bytes);
+            consumed_bytes += consumed;
+            ptr += consumed;
+
+            // extract data
+            consumed = explicit_extract_data(ptr, bit_s, bit_w, &data, consumed_bytes);
+            consumed_bytes += consumed;
+            ptr += consumed;
+
+            if (displacement == 0) {
+                OUTPUT("%s %s [%s], %d\n", op, data_type, destination, data);
+            } else {
+                OUTPUT("%s %s [%s + %d], %d\n", op, data_type, destination, displacement, data);
+            }
+            break;
+
+        case 0x3:
+            // Register Mode, No Displacement
+
+            // extract data
+            consumed = explicit_extract_data(ptr, bit_s, bit_w, &data, consumed_bytes);
+            consumed_bytes += consumed;
+            ptr += consumed;
+
+            OUTPUT("%s %s, %d\n", op, destination, data);
+            break;
+    }
+
+    return consumed_bytes;
+}
+
+/*
+ * Process a Immediate to Accumulator OP
+ *
+ * Returns number of bytes consumed, so the caller
+ * can skip ahead to process the next unprocessed bytes
+ * in the buffer
+ */
+int process_immediate_accumulator_op_inst(uint8_t *ptr, int op_type) {
+    int16_t data = 0;
+    int consumed = 0;
+    int consumed_bytes = 1;
+    uint8_t bit_w = (*ptr & 0x1);
+    char *op_type_str = NULL;
+    char *op = NULL;
+    char *reg = "AX";
+
+    switch (op_type) {
+        case ADD_IMMEDIATE_TO_ACCUMULATOR:
+            op_type_str = "ADD_IMMEDIATE_TO_ACCUMULATOR";
+            op = "add";
+            break;
+        case SUB_IMMEDIATE_FROM_ACCUMULATOR:
+            op_type_str = "SUB_IMMEDIATE_FROM_ACCUMULATOR";
+            op = "sub";
+            break;
+        case CMP_IMMEDIATE_WITH_ACCUMULATOR:
+            op_type_str = "CMP_IMMEDIATE_WITH_ACCUMULATOR";
+            op = "cmp";
+            break;
+        default:
+            ERROR("[%s:%d] ERROR: Bad OP[0x%x]\n", __FUNCTION__, __LINE__, op_type);
+    }
+    LOG("; [0x%02x] %s Byte - Found %s bitstream | W[%d]\n", *ptr, byte_count_str[consumed_bytes], op_type_str, bit_w);
+
+    // extract data
+    consumed = extract_data(ptr, bit_w, &data, consumed_bytes);
+    consumed_bytes += consumed;
+    ptr += consumed;
+
+    if (bit_w == 0x0) {
+        reg = "AL";
+    }
+
+    printf("%s %s, %d\n", op, reg, data);
+    fprintf(out_fp, "%s %s, %d\n", op, reg, data);
+
     return consumed_bytes;
 }
 
@@ -611,16 +920,41 @@ int main (int argc, char *argv[]) {
                 consumed_bytes = process_mov_immediate_to_register(ptr);
             } else if ( (*ptr>>2) == MOV_REGMEM_REG_INSTRUCTION) {
                 // found move register/memory to/from register
-                consumed_bytes = process_mov_regmem_reg_inst(ptr);
+                consumed_bytes = process_regmem_tpo_reg_op_inst(ptr, MOV_REGMEM_REG_INSTRUCTION);
             } else if ((*ptr>>1) == MOV_MEMORY_TO_ACCUMULATOR) {
                 // found memory to accumulator move
                 consumed_bytes = process_mov_accumulator_inst(ptr, MOV_MEMORY_TO_ACCUMULATOR);
             } else if ((*ptr>>1) == MOV_ACCUMULATOR_TO_MEMORY) {
                 // found memory to accumulator move
                 consumed_bytes = process_mov_accumulator_inst(ptr, MOV_ACCUMULATOR_TO_MEMORY);
+            } else if ((*ptr>>2) == ADD_REGMEM_WITH_REG) {
+                // found reg/memory add with register add
+                consumed_bytes = process_regmem_tpo_reg_op_inst(ptr, ADD_REGMEM_WITH_REG);
+            } else if ((*ptr>>2) == ADD_IMMEDIATE_TO_REGMEM) {
+                // found immediate to register/memory add and sub
+                // op codes for 
+                //      ADD_IMMEDIATE_TO_REGMEM 
+                //      SUB_IMMEDIATE_TO_REGMEM
+                //      CMP_IMMEDIATE_TO_REGMEM
+                // are the same
+                consumed_bytes = process_immediate_to_regmem_op_inst(ptr, ADD_IMMEDIATE_TO_REGMEM);
+            } else if ((*ptr>>1) == ADD_IMMEDIATE_TO_ACCUMULATOR) {
+                // found immediate to accumulator add
+                consumed_bytes = process_immediate_accumulator_op_inst(ptr, ADD_IMMEDIATE_TO_ACCUMULATOR);
+            } else if ((*ptr>>2) == SUB_REGMEM_WITH_REG) {
+                // found reg/memory with register sub
+                consumed_bytes = process_regmem_tpo_reg_op_inst(ptr, SUB_REGMEM_WITH_REG);
+            } else if ((*ptr>>1) == SUB_IMMEDIATE_FROM_ACCUMULATOR) {
+                // found reg/memory with register sub
+                consumed_bytes = process_immediate_accumulator_op_inst(ptr, SUB_IMMEDIATE_FROM_ACCUMULATOR);
+            } else if ((*ptr>>2) == CMP_REGMEM_WITH_REG) {
+                // found reg/memory with register sub
+                consumed_bytes = process_regmem_tpo_reg_op_inst(ptr, CMP_REGMEM_WITH_REG);
+            } else if ((*ptr>>1) == CMP_IMMEDIATE_WITH_ACCUMULATOR) {
+                // found reg/memory with register sub
+                consumed_bytes = process_immediate_accumulator_op_inst(ptr, CMP_IMMEDIATE_WITH_ACCUMULATOR);
             } else {
-                LOG("; [0x%02x] not a recognized instruction, continue search...\n", *ptr);
-                consumed_bytes = 1;
+                ERROR("; [0x%02x] not a recognized instruction, aborting...\n", *ptr);
             }
             LOG("\n");
             ptr+=consumed_bytes;
