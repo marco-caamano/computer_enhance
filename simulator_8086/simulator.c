@@ -601,18 +601,31 @@ int process_regmem_tpo_reg_op_inst(uint8_t *ptr, int op_type) {
         case 0x3:
             // Register Mode, No Displacement
             // get destination/source
+            struct reg_definition_s dst_item;
+            struct reg_definition_s src_item;
+            uint16_t val_before;
             if (bit_d == 0x1) {
                 // destination specificed in REG field
                 destination = register_map[reg][bit_w].name;
                 // source specificed in R/M field
                 source = register_map[r_m][bit_w].name;
+                // update registers
+                dst_item = register_map[reg][bit_w];
+                src_item = register_map[r_m][bit_w];
+                val_before = registers[dst_item.reg];
+                registers[dst_item.reg] = (registers[src_item.reg] & dst_item.mask) << dst_item.shift;
             } else {
                 // destination specificed in R/M field
                 destination = register_map[r_m][bit_w].name;
                 // source specificed in REG field
                 source = register_map[reg][bit_w].name;
+                // update registers
+                dst_item = register_map[r_m][bit_w];
+                src_item = register_map[reg][bit_w];
+                val_before = registers[dst_item.reg];
+                registers[dst_item.reg] = (registers[src_item.reg] & dst_item.mask) << dst_item.shift;
             }
-            printf("%s %s,%s\n", op, destination, source);
+            printf("%s %s,%s ; %s:0x%04x->0x%04x\n", op, destination, source, dst_item.name, val_before, registers[dst_item.reg]);
             break;
     }
     return consumed_bytes;
