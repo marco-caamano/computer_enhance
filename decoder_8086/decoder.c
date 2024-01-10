@@ -35,6 +35,11 @@
 #define MOV_MEMORY_TO_ACCUMULATOR           0x50
 // mov 1010001W => 101 0001
 #define MOV_ACCUMULATOR_TO_MEMORY           0x51
+// mov 10001110 => 1000 1110
+#define MOV_REGMEM_TO_SEGMENT_INSTRUCTION   0x8e
+// mov 10001100 => 1000 1100
+#define MOV_SEGMENT_TO_REGMEM_INSTRUCTION   0x8c
+
 
 // add 000000DW => 00 0000
 #define ADD_REGMEM_WITH_REG                 0x00
@@ -124,6 +129,13 @@ char *mov_source_effective_address[] = {
     "di",
     "bp",
     "bx"
+};
+
+char *segment_register_map[] = {
+    "es",
+    "cs",
+    "ss",
+    "ds"
 };
 
 char *byte_count_str[] = {
@@ -504,8 +516,8 @@ int process_mov_immediate_to_register(uint8_t *ptr) {
  * in the buffer
  */
 int process_regmem_tpo_reg_op_inst(uint8_t *ptr, int op_type) {
-    uint8_t bit_d = (*ptr & 0x2)>>1;
-    uint8_t bit_w = *ptr & 0x1;
+    uint8_t bit_d = 0;
+    uint8_t bit_w = 0;
     char *destination = NULL;
     char *source = NULL;
     int consumed = 0;
@@ -513,12 +525,30 @@ int process_regmem_tpo_reg_op_inst(uint8_t *ptr, int op_type) {
     int16_t displacement = 0;
     char *op_type_str = NULL;
     char *op = NULL;
+    uint8_t mod = 0;
+    uint8_t reg = 0;
+    uint8_t r_m = 0;
+    uint8_t sr = 0;
+    bool is_segment_op = false;
 
     switch (op_type) {
         case MOV_REGMEM_REG_INSTRUCTION:
             op_type_str = "MOV_REGMEM_REG_INSTRUCTION";
             op = "mov";
             break;
+
+        case MOV_REGMEM_TO_SEGMENT_INSTRUCTION:
+            op_type_str = "MOV_REGMEM_TO_SEGMENT_INSTRUCTION";
+            op = "mov";
+            is_segment_op = true;
+            break;
+
+        case MOV_SEGMENT_TO_REGMEM_INSTRUCTION:
+            op_type_str = "MOV_SEGMENT_TO_REGMEM_INSTRUCTION";
+            op = "mov";
+            is_segment_op = true;
+            break;
+
         case ADD_REGMEM_WITH_REG:
             op_type_str = "ADD_REGMEM_WITH_REG";
             op = "add";
@@ -535,15 +565,29 @@ int process_regmem_tpo_reg_op_inst(uint8_t *ptr, int op_type) {
             ERROR("[%s:%d] ERROR: Bad OP[0x%x]\n", __FUNCTION__, __LINE__, op_type);
     }
 
-    LOG("; [0x%02x] %s Byte - Found %s bitstream | D[%d] W[%d]\n", *ptr, byte_count_str[consumed_bytes], op_type_str, bit_d, bit_w);
+    if (is_segment_op) {
+        LOG("; [0x%02x] %s Byte - Found %s bitstream\n", *ptr, byte_count_str[consumed_bytes], op_type_str);
+    } else {
+        bit_d = (*ptr & 0x2)>>1;
+        bit_w = *ptr & 0x1;
+        LOG("; [0x%02x] %s Byte - Found %s bitstream | D[%d] W[%d]\n", *ptr, byte_count_str[consumed_bytes], op_type_str, bit_d, bit_w);
+    }
 
     // consume 2nd byte
     ptr++;
-    uint8_t mod = (*ptr >> 6) & 0x3;
-    uint8_t reg = (*ptr >> 3) & 0x7;
-    uint8_t r_m = (*ptr >> 0) & 0x7;
+    mod = (*ptr >> 6) & 0x3;
+    if (is_segment_op) {
+        sr = (*ptr >> 3) & 0x3;
+    } else {
+        reg = (*ptr >> 3) & 0x7;
+    }
+    r_m = (*ptr >> 0) & 0x7;
     consumed_bytes++;
-    LOG("; [0x%02x] 2nd Byte - MOD[0x%x] REG[0x%x] R/M[0x%x]\n", *ptr, mod, reg, r_m);
+    if (is_segment_op) {
+        LOG("; [0x%02x] 2nd Byte - MOD[0x%x] SR[0x%x] R/M[0x%x]\n", *ptr, mod, sr, r_m);
+    } else {
+        LOG("; [0x%02x] 2nd Byte - MOD[0x%x] REG[0x%x] R/M[0x%x]\n", *ptr, mod, reg, r_m);
+    }
 
     switch (mod) {
         case 0x0:
@@ -557,25 +601,39 @@ int process_regmem_tpo_reg_op_inst(uint8_t *ptr, int op_type) {
                 consumed_bytes += consumed;
                 ptr += consumed;
                 // destination specificed in REG field
-                destination = register_map[reg][bit_w];
-                // source is the direct address
-                printf("%s %s, [%d]\n", op, destination, displacement);
-                fprintf(out_fp, "%s %s, [%d]\n", op, destination, displacement);
-            } else {
-                if (bit_d == 0x1) {
-                    // destination specificed in REG field
-                    destination = register_map[reg][bit_w];
-                    // source specified in effective address table
-                    source = mov_source_effective_address[r_m];
-                    printf("%s %s, [%s]\n", op, destination, source);
-                    fprintf(out_fp, "%s %s, [%s]\n", op, destination, source);
+                if (is_segment_op) {
+                    destination = segment_register_map[sr];
                 } else {
-                    // destination specificed in R/M field
-                    destination = mov_source_effective_address[r_m];
-                    // source specified in REG field
-                    source = register_map[reg][bit_w];
-                    printf("%s [%s], %s\n", op, destination, source);
-                    fprintf(out_fp, "%s [%s], %s\n", op, destination, source);
+                    destination = register_map[reg][bit_w];
+                }
+                // source is the direct address
+                OUTPUT("%s %s, [%d]\n", op, destination, displacement);
+            } else {
+                if (is_segment_op) {
+                    if (op_type == MOV_REGMEM_TO_SEGMENT_INSTRUCTION) {
+                        destination = segment_register_map[sr];
+                        source = mov_source_effective_address[r_m];
+                        OUTPUT("%s %s, [%s]\n", op, destination, source);
+                    } else {
+                        // MOV_SEGMENT_TO_REGMEM_INSTRUCTION
+                        source = segment_register_map[sr];
+                        destination = mov_source_effective_address[r_m];
+                        OUTPUT("%s [%s], %s\n", op, destination, source);
+                    }
+                } else {
+                    if (bit_d == 0x1) {
+                        // destination specificed in REG field
+                        destination = register_map[reg][bit_w];
+                        // source specified in effective address table
+                        source = mov_source_effective_address[r_m];
+                        OUTPUT("%s %s, [%s]\n", op, destination, source);
+                    } else {
+                        // destination specificed in R/M field
+                        destination = mov_source_effective_address[r_m];
+                        // source specified in REG field
+                        source = register_map[reg][bit_w];
+                        OUTPUT("%s [%s], %s\n", op, destination, source);
+                    }
                 }
             }
             break;
@@ -586,31 +644,50 @@ int process_regmem_tpo_reg_op_inst(uint8_t *ptr, int op_type) {
             consumed = extract_displacement(ptr, 0, &displacement, consumed_bytes);
             consumed_bytes += consumed;
             ptr += consumed;
-            if (bit_d == 0x1) {
-                // destination specificed in REG field
-                destination = register_map[reg][bit_w];
-                // source specified in effective address table
-                source = mov_source_effective_address[r_m];
-                if (displacement==0) {
-                    // don't output " + 0" in the effective address calculation
-                    printf("%s %s, [%s]\n", op, destination, source);
-                    fprintf(out_fp, "%s %s, [%s]\n", op, destination, source);
+            if (is_segment_op) {
+                if (op_type == MOV_REGMEM_TO_SEGMENT_INSTRUCTION) {
+                    destination = segment_register_map[sr];
+                    source = register_map[r_m][1];
+                    if (displacement==0) {
+                        // don't output " + 0" in the effective address calculation
+                        OUTPUT("%s %s, [%s]\n", op, destination, source);
+                    } else {
+                        OUTPUT("%s %s, [%s + %d]\n", op, destination, source, displacement);
+                    }
                 } else {
-                    printf("%s %s, [%s + %d]\n", op, destination, source, displacement);
-                    fprintf(out_fp, "%s %s, [%s + %d]\n", op, destination, source, displacement);
+                    // MOV_SEGMENT_TO_REGMEM_INSTRUCTION
+                    source = segment_register_map[sr];
+                    destination = register_map[r_m][1];
+                    if (displacement==0) {
+                        // don't output " + 0" in the effective address calculation
+                        OUTPUT("%s [%s], %s\n", op, destination, source);
+                    } else {
+                        OUTPUT("%s [%s + %d], %s\n", op, destination, displacement, source);
+                    }
                 }
             } else {
-                // destination specificed in R/M field
-                destination = mov_source_effective_address[r_m];
-                // source specified in REG field
-                source = register_map[reg][bit_w];
-                if (displacement==0) {
-                    // don't output " + 0" in the effective address calculation
-                    printf("%s [%s], %s\n", op, destination, source);
-                    fprintf(out_fp, "%s [%s], %s\n", op, destination, source);
+                if (bit_d == 0x1) {
+                    // destination specificed in REG field
+                    destination = register_map[reg][bit_w];
+                    // source specified in effective address table
+                    source = mov_source_effective_address[r_m];
+                    if (displacement==0) {
+                        // don't output " + 0" in the effective address calculation
+                        OUTPUT("%s %s, [%s]\n", op, destination, source);
+                    } else {
+                        OUTPUT("%s %s, [%s + %d]\n", op, destination, source, displacement);
+                    }
                 } else {
-                    printf("%s [%s + %d], %s\n", op, destination, displacement, source);
-                    fprintf(out_fp, "%s [%s + %d], %s\n", op, destination,  displacement, source);
+                    // destination specificed in R/M field
+                    destination = mov_source_effective_address[r_m];
+                    // source specified in REG field
+                    source = register_map[reg][bit_w];
+                    if (displacement==0) {
+                        // don't output " + 0" in the effective address calculation
+                        OUTPUT("%s [%s], %s\n", op, destination, source);
+                    } else {
+                        OUTPUT("%s [%s + %d], %s\n", op, destination, displacement, source);
+                    }
                 }
             }
             break;
@@ -621,50 +698,79 @@ int process_regmem_tpo_reg_op_inst(uint8_t *ptr, int op_type) {
             consumed_bytes += consumed;
             ptr += consumed;
 
-            if (bit_d == 0x1) {
-                // destination specificed in REG field
-                destination = register_map[reg][bit_w];
-                // source specified in effective address table
-                source = mov_source_effective_address[r_m];
-                if (displacement==0) {
-                    // don't output " + 0" in the effective address calculation
-                    printf("%s %s, [%s]\n", op, destination, source);
-                    fprintf(out_fp, "%s %s, [%s]\n", op, destination, source);
+            if (is_segment_op) {
+                if (op_type == MOV_REGMEM_TO_SEGMENT_INSTRUCTION) {
+                    destination = segment_register_map[sr];
+                    source = register_map[r_m][1];
+                    if (displacement==0) {
+                        // don't output " + 0" in the effective address calculation
+                        OUTPUT("%s %s, [%s]\n", op, destination, source);
+                    } else {
+                        OUTPUT("%s %s, [%s + %d]\n", op, destination, source, displacement);
+                    }
                 } else {
-                    printf("%s %s, [%s + %d]\n", op, destination, source, displacement);
-                    fprintf(out_fp, "%s %s, [%s + %d]\n", op, destination, source, displacement);
+                    // MOV_SEGMENT_TO_REGMEM_INSTRUCTION
+                    source = segment_register_map[sr];
+                    destination = register_map[r_m][1];
+                    if (displacement==0) {
+                        // don't output " + 0" in the effective address calculation
+                        OUTPUT("%s [%s], %s\n", op, destination, source);
+                    } else {
+                        OUTPUT("%s [%s + %d], %s\n", op, destination, displacement, source);
+                    }
                 }
             } else {
-                // destination specificed in R/M field
-                destination = mov_source_effective_address[r_m];
-                // source specified in REG field
-                source = register_map[reg][bit_w];
-                if (displacement==0) {
-                    // don't output " + 0" in the effective address calculation
-                    printf("%s [%s], %s\n", op, destination, source);
-                    fprintf(out_fp, "%s [%s], %s\n", op, destination, source);
+                if (bit_d == 0x1) {
+                    // destination specificed in REG field
+                    destination = register_map[reg][bit_w];
+                    // source specified in effective address table
+                    source = mov_source_effective_address[r_m];
+                    if (displacement==0) {
+                        // don't output " + 0" in the effective address calculation
+                        OUTPUT("%s %s, [%s]\n", op, destination, source);
+                    } else {
+                        OUTPUT("%s %s, [%s + %d]\n", op, destination, source, displacement);
+                    }
                 } else {
-                    printf("%s [%s + %d], %s\n", op, destination, displacement, source);
-                    fprintf(out_fp, "%s [%s + %d], %s\n", op, destination,  displacement, source);
+                    // destination specificed in R/M field
+                    destination = mov_source_effective_address[r_m];
+                    // source specified in REG field
+                    source = register_map[reg][bit_w];
+                    if (displacement==0) {
+                        // don't output " + 0" in the effective address calculation
+                        OUTPUT("%s [%s], %s\n", op, destination, source);
+                    } else {
+                        OUTPUT("%s [%s + %d], %s\n", op, destination, displacement, source);
+                    }
                 }
             }
             break;
         case 0x3:
             // Register Mode, No Displacement
             // get destination/source
-            if (bit_d == 0x1) {
-                // destination specificed in REG field
-                destination = register_map[reg][bit_w];
-                // source specificed in R/M field
-                source = register_map[r_m][bit_w];
+            if (is_segment_op) {
+                if (op_type == MOV_REGMEM_TO_SEGMENT_INSTRUCTION) {
+                    destination = segment_register_map[sr];
+                    source = register_map[r_m][1];
+                } else {
+                    // MOV_SEGMENT_TO_REGMEM_INSTRUCTION
+                    source = segment_register_map[sr];
+                    destination = register_map[r_m][1];
+                }
             } else {
-                // destination specificed in R/M field
-                destination = register_map[r_m][bit_w];
-                // source specificed in REG field
-                source = register_map[reg][bit_w];
+                if (bit_d == 0x1) {
+                    // destination specificed in REG field
+                    destination = register_map[reg][bit_w];
+                    // source specificed in R/M field
+                    source = register_map[r_m][bit_w];
+                } else {
+                    // destination specificed in R/M field
+                    destination = register_map[r_m][bit_w];
+                    // source specificed in REG field
+                    source = register_map[reg][bit_w];
+                }
             }
-            printf("%s %s,%s\n", op, destination, source);
-            fprintf(out_fp, "%s %s,%s\n", op, destination, source);
+            OUTPUT("%s %s,%s\n", op, destination, source);
             break;
     }
     return consumed_bytes;
@@ -1082,6 +1188,12 @@ int main (int argc, char *argv[]) {
             } else if ((*ptr>>1) == MOV_ACCUMULATOR_TO_MEMORY) {
                 // found memory to accumulator move
                 consumed_bytes = process_mov_accumulator_inst(ptr, MOV_ACCUMULATOR_TO_MEMORY);
+            } else if (*ptr == MOV_REGMEM_TO_SEGMENT_INSTRUCTION) {
+                // found move register/memory to/from segment register
+                consumed_bytes = process_regmem_tpo_reg_op_inst(ptr, MOV_REGMEM_TO_SEGMENT_INSTRUCTION);
+            } else if (*ptr == MOV_SEGMENT_TO_REGMEM_INSTRUCTION) {
+                // found move register/memory to/from segment register
+                consumed_bytes = process_regmem_tpo_reg_op_inst(ptr, MOV_SEGMENT_TO_REGMEM_INSTRUCTION);
             } else if ((*ptr>>2) == ADD_REGMEM_WITH_REG) {
                 // found reg/memory add with register add
                 consumed_bytes = process_regmem_tpo_reg_op_inst(ptr, ADD_REGMEM_WITH_REG);
