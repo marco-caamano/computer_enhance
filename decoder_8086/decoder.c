@@ -338,12 +338,10 @@ int process_mov_accumulator_inst(uint8_t *ptr, int op_type) {
     LOG("; Address [0x%04x][%d]\n", address, address);
 
     if (op_type == MOV_MEMORY_TO_ACCUMULATOR) {
-        printf("mov ax, [ %d ]\n", address);
-        fprintf(out_fp, "mov ax, [ %d ]\n", address);
+        OUTPUT("mov ax, [ %d ]\n", address);
     } else {
         // MOV_ACCUMULATOR_TO_MEMORY
-        printf("mov [ %d ], ax\n", address);
-        fprintf(out_fp, "mov [ %d ], ax\n", address);
+        OUTPUT("mov [ %d ], ax\n", address);
     }
 
     return consumed_bytes;
@@ -398,11 +396,9 @@ int process_mov_immediate_to_register_memory(uint8_t *ptr) {
             ptr += consumed;
 
             if (displacement == 0) {
-                printf("mov [%s], %s %d\n", destination, data_type, data);
-                fprintf(out_fp, "mov [%s], %s %d\n", destination, data_type, data);
+                OUTPUT("mov [%s], %s %d\n", destination, data_type, data);
             } else {
-                printf("mov [%s + %d], %s %d\n", destination, displacement, data_type, data);
-                fprintf(out_fp, "mov [%s + %d], %s %d\n", destination, displacement, data_type, data);
+                OUTPUT("mov [%s + %d], %s %d\n", destination, displacement, data_type, data);
             }
             break;
 
@@ -420,11 +416,9 @@ int process_mov_immediate_to_register_memory(uint8_t *ptr) {
             ptr += consumed;
 
             if (displacement == 0) {
-                printf("mov [%s], %s %d\n", destination, data_type, data);
-                fprintf(out_fp, "mov [%s], %s %d\n", destination, data_type, data);
+                OUTPUT("mov [%s], %s %d\n", destination, data_type, data);
             } else {
-                printf("mov [%s + %d], %s %d\n", destination, displacement, data_type, data);
-                fprintf(out_fp, "mov [%s + %d], %s %d\n", destination, displacement, data_type, data);
+                OUTPUT("mov [%s + %d], %s %d\n", destination, displacement, data_type, data);
             }
             break;
 
@@ -447,11 +441,9 @@ int process_mov_immediate_to_register_memory(uint8_t *ptr) {
             }
 
             if (displacement == 0) {
-                printf("mov [%s], %s %d\n", destination, data_type, data);
-                fprintf(out_fp, "mov [%s], %s %d\n", destination, data_type, data);
+                OUTPUT("mov [%s], %s %d\n", destination, data_type, data);
             } else {
-                printf("mov [%s + %d], %s %d\n", destination, displacement, data_type, data);
-                fprintf(out_fp, "mov [%s + %d], %s %d\n", destination, displacement, data_type, data);
+                OUTPUT("mov [%s + %d], %s %d\n", destination, displacement, data_type, data);
             }
             break;
 
@@ -473,8 +465,7 @@ int process_mov_immediate_to_register_memory(uint8_t *ptr) {
                 data_type = "word";
             }
 
-            printf("mov [%s], %s %d\n", destination, data_type, data);
-            fprintf(out_fp, "mov [%s], %s %d\n", destination, data_type, data);
+            OUTPUT("mov [%s], %s %d\n", destination, data_type, data);
             break;
     }
 
@@ -503,8 +494,7 @@ int process_mov_immediate_to_register(uint8_t *ptr) {
     consumed_bytes += consumed;
     ptr += consumed;
 
-    printf("mov %s,%d\n", reg_str, data);
-    fprintf(out_fp, "mov %s,%d\n", reg_str, data);
+    OUTPUT("mov %s,%d\n", reg_str, data);
     return consumed_bytes;
 }
 
@@ -964,8 +954,7 @@ int process_immediate_accumulator_op_inst(uint8_t *ptr, int op_type) {
         reg = "AL";
     }
 
-    printf("%s %s, %d\n", op, reg, data);
-    fprintf(out_fp, "%s %s, %d\n", op, reg, data);
+    OUTPUT("%s %s, %d\n", op, reg, data);
 
     return consumed_bytes;
 }
