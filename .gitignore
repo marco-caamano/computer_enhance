@@ -2,6 +2,8 @@
 decoder
 simulator
 
+.vscode
+
 # ignore test binaries
 *.bin
 

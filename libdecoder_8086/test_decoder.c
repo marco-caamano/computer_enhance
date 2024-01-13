@@ -9,17 +9,6 @@
 
 #include "libdecoder.h"
 
-#define LOG(...) {                  \
-        if (verbose) {              \
-            printf(__VA_ARGS__);    \
-        }                           \
-    }
-
-#define ERROR(...) {                    \
-        fprintf(stderr, __VA_ARGS__);   \
-        exit(1);                        \
-    }
-
 #define BUFFER_SIZE 1024*1024
 
 void usage(void) {
@@ -93,9 +82,12 @@ int main (int argc, char *argv[]) {
 
     LOG("Read [%zu] bytes from file\n\n", bytes_available);
 
-    int ret = decode_bitstream(buffer, bytes_available, verbose);
-    LOG("decode_bitstream returned %s\n", (ret==0) ? "OK" : "Failed");
-
+    size_t consumed = decode_bitstream(buffer, bytes_available, verbose);
+    if (consumed == bytes_available) {
+        LOG("decode_bitstream consumed all %zu bytes from file\n", bytes_available);
+    } else {
+        ERROR("decode_bitstream failed to consume all %zu bytes from file (consumed %zu bytes)\n", bytes_available, consumed);
+    }
 
     return 0;
 }

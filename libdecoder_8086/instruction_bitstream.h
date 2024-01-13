@@ -24,6 +24,10 @@ enum instructions_e {
  * 
  */
 
+#define MOD_FIELD_MASK  0x3
+#define REG_FIELD_MASK  0x7
+#define RM_FIELD_MASK   0x7
+
 /*
  * OpCode Bitstream struc
  *
@@ -31,10 +35,22 @@ enum instructions_e {
  * are present and where can they be extracted
  */
 struct opcode_bitstream_s {
-    enum instructions_e op;     // Instruction encoded in opcode bitstream
-    uint8_t opcode;             // bits to match for opcode
-    uint8_t opcode_bitmask;     // bitmask to apply to opcode byte before comparrison against opcode
-    bool byte1_has_d_flag;      // D Flag is present in byte1
+    const enum instructions_e op;     // Instruction encoded in opcode bitstream
+    const char *name;                 // Long Name for OP
+    const uint8_t opcode;             // bits to match for opcode
+    const uint8_t opcode_bitmask;     // bitmask to apply to opcode byte before comparrison against opcode
+
+    const bool byte1_has_d_flag;      // D Flag is present in byte1
+
+    const bool byte1_has_w_flag;      // W Flag is present in byte1
+    const uint8_t w_flag_shift;       // Shift for W Flag
+
+    const bool byte1_has_reg_field;   // REG field is present in byte1
+    const bool byte2_has_reg_field;   // REG field is present in byte2
+    const uint8_t reg_field_shift;    // Shift for REG Field, depending on which byte it is located
+
+    const bool byte2_has_mod_field;   // MOD field is present in byte2 | Shift is always the same
+    const bool byte2_has_rm_field;    // RM field is present in byte2 | Shift is always the same
 
 };
 
