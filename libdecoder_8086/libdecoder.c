@@ -6,6 +6,9 @@
 #include "libdecoder.h"
 #include "instruction_bitstream.h"
 
+#define STR_BUFFER_SIZE         32
+#define DUMP_STR_BUFFER_SIZE    3*STR_BUFFER_SIZE
+
 // This must match against instructions_e enum
 const char *instruction_name[] = {
     "mov",
@@ -27,7 +30,8 @@ const char *register_name[] = {
     "sp",
     "bp",
     "si",
-    "di" 
+    "di",
+    "INVALID"
 };
 
 const enum register_e register_map[8][2] = {
@@ -45,7 +49,8 @@ const char *segment_register_name[] = {
     "es",
     "cs",
     "ss",
-    "ds"
+    "ds",
+    "INVALID"
 };
 
 const enum segment_register_e segment_register_map[] = {
@@ -88,6 +93,14 @@ char *byte_count_str[] = {
     "6th"
 };
 
+char *type_str[] = {
+    "Register",
+    "Segment Register",
+    "Direct Address",
+    "Effective Address",
+    "Invalid",
+};
+
 bool verbose = false;
 
 /*
@@ -111,6 +124,132 @@ void reset_instruction(struct decoded_instruction_s *inst) {
     inst->dst_effective_reg1 = MAX_REG;
     inst->dst_effective_reg2 = MAX_REG;
     inst->dst_effective_displacement = 0;
+}
+
+void dump_instruction(struct decoded_instruction_s *inst) {
+    LOG("; Dump Instruction:\n");
+    LOG("; op                          %s\n", instruction_name[inst->op]);
+    LOG("; name                        %s\n", inst->name);
+    LOG("; src_type                    %s\n", type_str[inst->src_type]);
+    LOG("; src_register                %s\n", register_name[inst->src_register]);
+    LOG("; src_seg_register            %s\n", segment_register_name[inst->src_seg_register]);
+    LOG("; src_direct_address          0x%04x\n", inst->src_direct_address);
+    LOG("; src_effective_reg1          %s\n", register_name[inst->src_effective_reg1]);
+    LOG("; src_effective_reg2          %s\n", register_name[inst->src_effective_reg2]);
+    LOG("; src_effective_displacement  0x%04x\n", inst->src_effective_displacement);
+    LOG("; dst_type                    %s\n", type_str[inst->dst_type]);
+    LOG("; dst_register                %s\n", register_name[inst->dst_register]);
+    LOG("; dst_seg_register            %s\n", segment_register_name[inst->dst_seg_register]);
+    LOG("; dst_direct_address          0x%04x\n", inst->dst_direct_address);
+    LOG("; dst_effective_reg1          %s\n", register_name[inst->dst_effective_reg1]);
+    LOG("; dst_effective_reg2          %s\n", register_name[inst->dst_effective_reg2]);
+    LOG("; dst_effective_displacement  0x%04x\n", inst->dst_effective_displacement);
+}
+
+
+void dump_decoded_instruction(struct decoded_instruction_s *inst) {
+    char dump_buffer[3*DUMP_STR_BUFFER_SIZE] = {0};
+    char dst_buffer[STR_BUFFER_SIZE] = {0};
+    char src_buffer[STR_BUFFER_SIZE] = {0};
+
+    switch (inst->dst_type) {
+        case TYPE_REGISTER:
+            snprintf((char *)&dst_buffer, STR_BUFFER_SIZE, "%s", 
+                register_name[inst->dst_register]);
+            break;
+        case TYPE_SEGMENT_REGISTER:
+            snprintf((char *)&dst_buffer, STR_BUFFER_SIZE, "%s", 
+                segment_register_name[inst->dst_seg_register]);
+            break;
+        case TYPE_DIRECT_ADDRESS:
+            snprintf((char *)&dst_buffer, STR_BUFFER_SIZE, "[ %d ]", 
+                inst->dst_direct_address);
+            break;
+        case TYPE_EFFECTIVE_ADDRESS:
+            if (inst->dst_effective_reg2<MAX_REG) {
+                // we have a valid second effective register
+                if (inst->dst_effective_displacement != 0) {
+                    snprintf((char *)&dst_buffer, STR_BUFFER_SIZE, 
+                        "[ %s + %s + %d ]", 
+                        register_name[inst->dst_effective_reg1],
+                        register_name[inst->dst_effective_reg2],
+                        inst->dst_effective_displacement);
+                } else {
+                    snprintf((char *)&dst_buffer, STR_BUFFER_SIZE,
+                        "[ %s + %s ]", 
+                        register_name[inst->dst_effective_reg1],
+                        register_name[inst->dst_effective_reg2]);
+                }
+            } else {
+                // we only have the first effective register
+                if (inst->dst_effective_displacement != 0) {
+                    snprintf((char *)&dst_buffer, STR_BUFFER_SIZE,
+                        "[ %s + %d ]", 
+                        register_name[inst->dst_effective_reg1],
+                        inst->dst_effective_displacement);
+                } else {
+                    snprintf((char *)&dst_buffer, STR_BUFFER_SIZE,
+                        "[ %s ]", 
+                        register_name[inst->dst_effective_reg1]);
+                }
+            }
+            break;
+        default:
+            ERROR("Invalid dst_type[%d] Type\n", inst->dst_type);
+            break;
+    }
+
+    switch (inst->src_type) {
+        case TYPE_REGISTER:
+            snprintf((char *)&src_buffer, STR_BUFFER_SIZE, "%s",
+                register_name[inst->src_register]);
+            break;
+        case TYPE_SEGMENT_REGISTER:
+            snprintf((char *)&src_buffer, STR_BUFFER_SIZE, "%s",
+                segment_register_name[inst->src_seg_register]);
+            break;
+        case TYPE_DIRECT_ADDRESS:
+            snprintf((char *)&src_buffer, STR_BUFFER_SIZE, "[ %d ]",
+                inst->src_direct_address);
+            break;
+        case TYPE_EFFECTIVE_ADDRESS:
+            if (inst->src_effective_reg2<MAX_REG) {
+                // we have a valid second effective register
+                if (inst->src_effective_displacement != 0) {
+                    snprintf((char *)&src_buffer, STR_BUFFER_SIZE,
+                        "[ %s + %s + %d ]", 
+                        register_name[inst->src_effective_reg1],
+                        register_name[inst->src_effective_reg2],
+                        inst->src_effective_displacement);
+                } else {
+                    snprintf((char *)&src_buffer, STR_BUFFER_SIZE,
+                        "[ %s + %s ]", 
+                        register_name[inst->src_effective_reg1],
+                        register_name[inst->src_effective_reg2]);
+                }
+            } else {
+                // we only have the first effective register
+                if (inst->src_effective_displacement != 0) {
+                    snprintf((char *)&src_buffer, STR_BUFFER_SIZE,
+                        "[ %s + %d ]", 
+                        register_name[inst->src_effective_reg1],
+                        inst->src_effective_displacement);
+                } else {
+                    snprintf((char *)&src_buffer, STR_BUFFER_SIZE,
+                        "[ %s ]", 
+                        register_name[inst->src_effective_reg1]);
+                }
+            }
+            break;
+        default:
+            ERROR("Invalid src_type[%d] Type\n", inst->src_type);
+            break;
+    }
+
+    // put it all together
+    snprintf((char *)&dump_buffer, DUMP_STR_BUFFER_SIZE, "%s %s, %s", 
+        instruction_name[inst->op], dst_buffer, src_buffer);
+    LOG("%s\n", dump_buffer);
 }
 
 /*
@@ -491,9 +630,10 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
     if (cmd->op_has_address_bytes) {
 
     }
-    
-    
-    
+
+    dump_instruction(&instruction);
+    dump_decoded_instruction(&instruction);
+
     return consumed_bytes;
 }
 
