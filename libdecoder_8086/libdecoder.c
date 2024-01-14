@@ -147,7 +147,7 @@ void dump_instruction(struct decoded_instruction_s *inst) {
 }
 
 
-void dump_decoded_instruction(struct decoded_instruction_s *inst) {
+void print_decoded_instruction(struct decoded_instruction_s *inst) {
     char dump_buffer[3*DUMP_STR_BUFFER_SIZE] = {0};
     char dst_buffer[STR_BUFFER_SIZE] = {0};
     char src_buffer[STR_BUFFER_SIZE] = {0};
@@ -249,7 +249,7 @@ void dump_decoded_instruction(struct decoded_instruction_s *inst) {
     // put it all together
     snprintf((char *)&dump_buffer, DUMP_STR_BUFFER_SIZE, "%s %s, %s", 
         instruction_name[inst->op], dst_buffer, src_buffer);
-    LOG("%s\n", dump_buffer);
+    printf("%s\n", dump_buffer);
 }
 
 /*
@@ -630,41 +630,24 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
     }
 
     dump_instruction(inst_result);
-    dump_decoded_instruction(inst_result);
 
     return consumed_bytes;
 }
 
-size_t decode_bitstream(uint8_t *buffer, size_t len, bool verbose, struct decoded_instruction_s *inst_result) {
-    size_t bytes_available = len;
-    size_t bytes_consumed = 0;
-    size_t total_consumed = 0;
-    uint8_t *ptr = buffer;
+size_t decode_bitstream(uint8_t *ptr, size_t bytes_available, bool verbose, struct decoded_instruction_s *inst_result) {
     size_t op_cmd_size = sizeof(op_cmds) / sizeof(struct opcode_bitstream_s *);
 
-    LOG("; [%s:%d] buffer[%p] size[%zu] verbose[%s]\n\n", __FUNCTION__, __LINE__, buffer, len, verbose ? "True" : "False");
+    LOG("; [%s:%d] ptr[%p] bytes_available[%zu] verbose[%s]\n\n", __FUNCTION__, __LINE__, ptr, bytes_available, verbose ? "True" : "False");
 
-    while ( total_consumed < bytes_available) {
-        bytes_consumed = 0;
-        LOG("; Testing byte[0x%x] for 8086 instructions\n", *ptr);
-        for (size_t i=0; i<op_cmd_size; i++) {
-            LOG("; Testing for OP[0x%x]\n", op_cmds[i]->opcode);
-            if ( (*ptr & op_cmds[i]->opcode_bitmask) == op_cmds[i]->opcode ) {
-                LOG("; Matched OP[0x%x][%s]\n", op_cmds[i]->opcode, op_cmds[i]->name);
-                bytes_consumed = parse_instruction(ptr, op_cmds[i], verbose, inst_result);
-                break;
-            }
+    LOG("; Testing byte[0x%x] for 8086 instructions\n", *ptr);
+    for (size_t i=0; i<op_cmd_size; i++) {
+        LOG("; Testing for OP[0x%x]\n", op_cmds[i]->opcode);
+        if ( (*ptr & op_cmds[i]->opcode_bitmask) == op_cmds[i]->opcode ) {
+            LOG("; Matched OP[0x%x][%s]\n", op_cmds[i]->opcode, op_cmds[i]->name);
+            return parse_instruction(ptr, op_cmds[i], verbose, inst_result);
         }
-        if (bytes_consumed==0) {
-            LOG("; Failed to match byte[0x%x] for 8086 instructions, continuing to next byte\n", *ptr);
-            bytes_consumed=1;
-        }
-
-        
-        ptr += bytes_consumed;
-        total_consumed += bytes_consumed;
-        LOG("; Consumed %zu bytes | total consumed %zu\n\n", bytes_consumed, total_consumed);
     }
-
-    return total_consumed;
+    LOG("; Failed to match byte[0x%x] for 8086 instructions\n", *ptr);
+  
+    return 0;
 }

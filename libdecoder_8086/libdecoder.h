@@ -125,4 +125,6 @@ struct decoded_instruction_s {
 
 
 
-size_t decode_bitstream(uint8_t *buffer, size_t len, bool is_verbose, struct decoded_instruction_s *inst_result);
+size_t decode_bitstream(uint8_t *ptr, size_t bytes_available, bool is_verbose, struct decoded_instruction_s *inst_result);
+
+void print_decoded_instruction(struct decoded_instruction_s *inst);

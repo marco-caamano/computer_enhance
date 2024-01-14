@@ -32,7 +32,7 @@ for test_file in `ls listing*.asm`; do
         exit 1
     fi
     echo "##     Decoding $test_file.bin File"
-    ../decoder -i $test_file.bin -o out_$test_file.asm 
+    ../decoder -i $test_file.bin > out_$test_file.asm 
     if [ $? -ne 0 ] ; then
         echo "## ERROR: Failed to decode assembly[$test_file.bin]"
         exit 1

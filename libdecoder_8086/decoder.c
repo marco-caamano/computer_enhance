@@ -83,12 +83,27 @@ int main (int argc, char *argv[]) {
 
     LOG("Read [%zu] bytes from file\n\n", bytes_available);
 
-    size_t consumed = decode_bitstream(buffer, bytes_available, verbose, &instruction);
-    if (consumed == bytes_available) {
-        LOG("decode_bitstream consumed all %zu bytes from file\n", bytes_available);
-    } else {
-        ERROR("decode_bitstream failed to consume all %zu bytes from file (consumed %zu bytes)\n", bytes_available, consumed);
+    printf("; =======================================================================\n");
+    printf("; Decoder results for file [%s]\n", input_file);
+    printf("; \n");
+    printf("; =======================================================================\n");
+    printf("\n\nbits 16\n\n");
+
+    uint8_t *ptr = buffer;
+    while (bytes_available > 0) {
+        size_t consumed = decode_bitstream(ptr, bytes_available, verbose, &instruction);
+        if (consumed == 0) {
+            ERROR("Failed to decode instruction at byte[%zu]->[0x%02x]\n", ptr-buffer, *ptr);
+        }
+        bytes_available -= consumed;
+        ptr += consumed;
+
+        // print the instruction
+        print_decoded_instruction(&instruction);
+
     }
+    
+    LOG("decode_bitstream consumed all %zu bytes from file\n", bytes_available);
 
     return 0;
 }
