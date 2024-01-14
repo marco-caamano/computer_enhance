@@ -1,6 +1,7 @@
 # ignore binaries
 decoder
 simulator
+test_decoder
 
 .vscode
 
