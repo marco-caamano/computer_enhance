@@ -4,6 +4,7 @@
  */
 #include <stdint.h>
 #include <stdbool.h>
+#include <aio.h>
 
 #define LOG(...) {                  \
         if (verbose) {              \
@@ -102,7 +103,7 @@ enum operand_type_e {
  */
 struct decoded_instruction_s {
     enum instructions_e op;                     // Instruction encoded in opcode bitstream
-    const char *name;                                 // Long Name for OP
+    const char *name;                           // Long Name for OP
     
     enum operand_type_e src_type;               // Source Type
     enum register_e src_register;               // Source Register when src_type is TYPE_REGISTER
@@ -124,4 +125,4 @@ struct decoded_instruction_s {
 
 
 
-size_t decode_bitstream(uint8_t *buffer, size_t len, bool is_verbose);
+size_t decode_bitstream(uint8_t *buffer, size_t len, bool is_verbose, struct decoded_instruction_s *inst_result);

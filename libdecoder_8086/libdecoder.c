@@ -329,7 +329,7 @@ size_t extract_direct_address(uint8_t *ptr, uint16_t *direct_address, size_t pre
     return consumed_bytes;
 }
 
-size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_verbose) {
+size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_verbose, struct decoded_instruction_s *inst_result) {
     size_t consumed_bytes = 1;
     size_t consumed = 0;
     uint8_t d_bit = 0;
@@ -347,16 +347,14 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
     
     int16_t displacement = 0;
 
-    struct decoded_instruction_s instruction;
-
-    reset_instruction(&instruction);
+    reset_instruction(inst_result);
 
     verbose = is_verbose;
 
     LOG("; [0x%02x] %s Byte - Found Op[%s][%s] ", *ptr, byte_count_str[consumed_bytes], instruction_name[cmd->op], cmd->name);
 
-    instruction.op = cmd->op;
-    instruction.name = cmd->name;
+    inst_result->op = cmd->op;
+    inst_result->name = cmd->name;
 
     // extract any stuff from 1st byte
     if (cmd->byte1_has_d_flag) {
@@ -425,59 +423,59 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
                     // special case R/M is 110
                     // 16 bit displacement follows
                     // source is the direct address
-                    instruction.src_type = TYPE_DIRECT_ADDRESS;
-                    consumed = extract_direct_address(ptr, &instruction.src_direct_address, consumed_bytes);
+                    inst_result->src_type = TYPE_DIRECT_ADDRESS;
+                    consumed = extract_direct_address(ptr, &inst_result->src_direct_address, consumed_bytes);
                     consumed_bytes += consumed;
                     ptr += consumed;
                     if (has_sr) {
                         // destination specified in SR field
-                        instruction.dst_type = TYPE_SEGMENT_REGISTER;
-                        instruction.dst_seg_register = segment_register_map[sr_field];
+                        inst_result->dst_type = TYPE_SEGMENT_REGISTER;
+                        inst_result->dst_seg_register = segment_register_map[sr_field];
                     } else {
                         // destination specificed in REG field
-                        instruction.dst_type = TYPE_REGISTER;
-                        instruction.dst_register = register_map[reg_field][w_bit];
+                        inst_result->dst_type = TYPE_REGISTER;
+                        inst_result->dst_register = register_map[reg_field][w_bit];
                     }
                 } else {
                     if (has_sr) {
                         if (cmd->sr_is_target) {
                             // Segment register is the destination
-                            instruction.dst_type = TYPE_SEGMENT_REGISTER;
-                            instruction.dst_seg_register = segment_register_map[sr_field];
+                            inst_result->dst_type = TYPE_SEGMENT_REGISTER;
+                            inst_result->dst_seg_register = segment_register_map[sr_field];
                             // Source is the effective address
-                            instruction.src_type = TYPE_EFFECTIVE_ADDRESS;
-                            instruction.src_effective_reg1 = mod_effective_address_map[rm_field][0];
-                            instruction.src_effective_reg2 = mod_effective_address_map[rm_field][1];
-                            instruction.src_effective_displacement = 0;
+                            inst_result->src_type = TYPE_EFFECTIVE_ADDRESS;
+                            inst_result->src_effective_reg1 = mod_effective_address_map[rm_field][0];
+                            inst_result->src_effective_reg2 = mod_effective_address_map[rm_field][1];
+                            inst_result->src_effective_displacement = 0;
                         } else {
                             // Segment register is the source
-                            instruction.src_type = TYPE_SEGMENT_REGISTER;
-                            instruction.src_seg_register = segment_register_map[sr_field];
+                            inst_result->src_type = TYPE_SEGMENT_REGISTER;
+                            inst_result->src_seg_register = segment_register_map[sr_field];
                             // Destination is the effective address
-                            instruction.dst_type = TYPE_EFFECTIVE_ADDRESS;
-                            instruction.dst_effective_reg1 = mod_effective_address_map[rm_field][0];
-                            instruction.dst_effective_reg2 = mod_effective_address_map[rm_field][1];
-                            instruction.dst_effective_displacement = 0;
+                            inst_result->dst_type = TYPE_EFFECTIVE_ADDRESS;
+                            inst_result->dst_effective_reg1 = mod_effective_address_map[rm_field][0];
+                            inst_result->dst_effective_reg2 = mod_effective_address_map[rm_field][1];
+                            inst_result->dst_effective_displacement = 0;
                         }
                     } else {
                         if (d_bit == 0x1) {
                             // destination specificed in REG field
-                            instruction.dst_type = TYPE_REGISTER;
-                            instruction.dst_register = register_map[reg_field][w_bit];
+                            inst_result->dst_type = TYPE_REGISTER;
+                            inst_result->dst_register = register_map[reg_field][w_bit];
                             // source specified in effective address table
-                            instruction.src_type = TYPE_EFFECTIVE_ADDRESS;
-                            instruction.src_effective_reg1 = mod_effective_address_map[rm_field][0];
-                            instruction.src_effective_reg2 = mod_effective_address_map[rm_field][1];
-                            instruction.src_effective_displacement = 0;
+                            inst_result->src_type = TYPE_EFFECTIVE_ADDRESS;
+                            inst_result->src_effective_reg1 = mod_effective_address_map[rm_field][0];
+                            inst_result->src_effective_reg2 = mod_effective_address_map[rm_field][1];
+                            inst_result->src_effective_displacement = 0;
                         } else {
                             // destination specificed in R/M field
-                            instruction.dst_type = TYPE_EFFECTIVE_ADDRESS;
-                            instruction.dst_effective_reg1 = mod_effective_address_map[rm_field][0];
-                            instruction.dst_effective_reg2 = mod_effective_address_map[rm_field][1];
-                            instruction.dst_effective_displacement = 0;
+                            inst_result->dst_type = TYPE_EFFECTIVE_ADDRESS;
+                            inst_result->dst_effective_reg1 = mod_effective_address_map[rm_field][0];
+                            inst_result->dst_effective_reg2 = mod_effective_address_map[rm_field][1];
+                            inst_result->dst_effective_displacement = 0;
                             // source specified in REG field
-                            instruction.src_type = TYPE_REGISTER;
-                            instruction.src_register = register_map[reg_field][w_bit];
+                            inst_result->src_type = TYPE_REGISTER;
+                            inst_result->src_register = register_map[reg_field][w_bit];
                         }
                     }
                 }
@@ -492,42 +490,42 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
                 if (has_sr) {
                     if (cmd->sr_is_target) {
                         // Segment register is the destination
-                        instruction.dst_type = TYPE_SEGMENT_REGISTER;
-                        instruction.dst_seg_register = segment_register_map[sr_field];
+                        inst_result->dst_type = TYPE_SEGMENT_REGISTER;
+                        inst_result->dst_seg_register = segment_register_map[sr_field];
                         // Source is the effective address
-                        instruction.src_type = TYPE_EFFECTIVE_ADDRESS;
-                        instruction.src_effective_reg1 = mod_effective_address_map[rm_field][0];
-                        instruction.src_effective_reg2 = mod_effective_address_map[rm_field][1];
-                        instruction.src_effective_displacement = displacement;
+                        inst_result->src_type = TYPE_EFFECTIVE_ADDRESS;
+                        inst_result->src_effective_reg1 = mod_effective_address_map[rm_field][0];
+                        inst_result->src_effective_reg2 = mod_effective_address_map[rm_field][1];
+                        inst_result->src_effective_displacement = displacement;
                     } else {
                         // Segment register is the source
-                        instruction.src_type = TYPE_SEGMENT_REGISTER;
-                        instruction.src_seg_register = segment_register_map[sr_field];
+                        inst_result->src_type = TYPE_SEGMENT_REGISTER;
+                        inst_result->src_seg_register = segment_register_map[sr_field];
                         // Destination is the effective address
-                        instruction.dst_type = TYPE_EFFECTIVE_ADDRESS;
-                        instruction.dst_effective_reg1 = mod_effective_address_map[rm_field][0];
-                        instruction.dst_effective_reg2 = mod_effective_address_map[rm_field][1];
-                        instruction.dst_effective_displacement = displacement;
+                        inst_result->dst_type = TYPE_EFFECTIVE_ADDRESS;
+                        inst_result->dst_effective_reg1 = mod_effective_address_map[rm_field][0];
+                        inst_result->dst_effective_reg2 = mod_effective_address_map[rm_field][1];
+                        inst_result->dst_effective_displacement = displacement;
                     }
                 } else {
                     if (d_bit == 0x1) {
                         // destination specificed in REG field
-                        instruction.dst_type = TYPE_REGISTER;
-                        instruction.dst_register = register_map[reg_field][w_bit];
+                        inst_result->dst_type = TYPE_REGISTER;
+                        inst_result->dst_register = register_map[reg_field][w_bit];
                         // source specified in effective address table
-                        instruction.src_type = TYPE_EFFECTIVE_ADDRESS;
-                        instruction.src_effective_reg1 = mod_effective_address_map[rm_field][0];
-                        instruction.src_effective_reg2 = mod_effective_address_map[rm_field][1];
-                        instruction.src_effective_displacement = displacement;
+                        inst_result->src_type = TYPE_EFFECTIVE_ADDRESS;
+                        inst_result->src_effective_reg1 = mod_effective_address_map[rm_field][0];
+                        inst_result->src_effective_reg2 = mod_effective_address_map[rm_field][1];
+                        inst_result->src_effective_displacement = displacement;
                     } else {
                         // destination specificed in R/M field
-                        instruction.dst_type = TYPE_EFFECTIVE_ADDRESS;
-                        instruction.dst_effective_reg1 = mod_effective_address_map[rm_field][0];
-                        instruction.dst_effective_reg2 = mod_effective_address_map[rm_field][1];
-                        instruction.dst_effective_displacement = displacement;
+                        inst_result->dst_type = TYPE_EFFECTIVE_ADDRESS;
+                        inst_result->dst_effective_reg1 = mod_effective_address_map[rm_field][0];
+                        inst_result->dst_effective_reg2 = mod_effective_address_map[rm_field][1];
+                        inst_result->dst_effective_displacement = displacement;
                         // source specified in REG field
-                        instruction.src_type = TYPE_REGISTER;
-                        instruction.src_register = register_map[reg_field][w_bit];
+                        inst_result->src_type = TYPE_REGISTER;
+                        inst_result->src_register = register_map[reg_field][w_bit];
                     }
                 }
                 break;
@@ -540,42 +538,42 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
                 if (has_sr) {
                     if (cmd->sr_is_target) {
                         // Segment register is the destination
-                        instruction.dst_type = TYPE_SEGMENT_REGISTER;
-                        instruction.dst_seg_register = segment_register_map[sr_field];
+                        inst_result->dst_type = TYPE_SEGMENT_REGISTER;
+                        inst_result->dst_seg_register = segment_register_map[sr_field];
                         // Source is the effective address
-                        instruction.src_type = TYPE_EFFECTIVE_ADDRESS;
-                        instruction.src_effective_reg1 = mod_effective_address_map[rm_field][0];
-                        instruction.src_effective_reg2 = mod_effective_address_map[rm_field][1];
-                        instruction.src_effective_displacement = displacement;
+                        inst_result->src_type = TYPE_EFFECTIVE_ADDRESS;
+                        inst_result->src_effective_reg1 = mod_effective_address_map[rm_field][0];
+                        inst_result->src_effective_reg2 = mod_effective_address_map[rm_field][1];
+                        inst_result->src_effective_displacement = displacement;
                     } else {
                         // Segment register is the source
-                        instruction.src_type = TYPE_SEGMENT_REGISTER;
-                        instruction.src_seg_register = segment_register_map[sr_field];
+                        inst_result->src_type = TYPE_SEGMENT_REGISTER;
+                        inst_result->src_seg_register = segment_register_map[sr_field];
                         // Destination is the effective address
-                        instruction.dst_type = TYPE_EFFECTIVE_ADDRESS;
-                        instruction.dst_effective_reg1 = mod_effective_address_map[rm_field][0];
-                        instruction.dst_effective_reg2 = mod_effective_address_map[rm_field][1];
-                        instruction.dst_effective_displacement = displacement;
+                        inst_result->dst_type = TYPE_EFFECTIVE_ADDRESS;
+                        inst_result->dst_effective_reg1 = mod_effective_address_map[rm_field][0];
+                        inst_result->dst_effective_reg2 = mod_effective_address_map[rm_field][1];
+                        inst_result->dst_effective_displacement = displacement;
                     }
                 } else {
                     if (d_bit == 0x1) {
                         // destination specificed in REG field
-                        instruction.dst_type = TYPE_REGISTER;
-                        instruction.dst_register = register_map[reg_field][w_bit];
+                        inst_result->dst_type = TYPE_REGISTER;
+                        inst_result->dst_register = register_map[reg_field][w_bit];
                         // source specified in effective address table
-                        instruction.src_type = TYPE_EFFECTIVE_ADDRESS;
-                        instruction.src_effective_reg1 = mod_effective_address_map[rm_field][0];
-                        instruction.src_effective_reg2 = mod_effective_address_map[rm_field][1];
-                        instruction.src_effective_displacement = displacement;
+                        inst_result->src_type = TYPE_EFFECTIVE_ADDRESS;
+                        inst_result->src_effective_reg1 = mod_effective_address_map[rm_field][0];
+                        inst_result->src_effective_reg2 = mod_effective_address_map[rm_field][1];
+                        inst_result->src_effective_displacement = displacement;
                     } else {
                         // destination specificed in R/M field
-                        instruction.dst_type = TYPE_EFFECTIVE_ADDRESS;
-                        instruction.dst_effective_reg1 = mod_effective_address_map[rm_field][0];
-                        instruction.dst_effective_reg2 = mod_effective_address_map[rm_field][1];
-                        instruction.dst_effective_displacement = displacement;
+                        inst_result->dst_type = TYPE_EFFECTIVE_ADDRESS;
+                        inst_result->dst_effective_reg1 = mod_effective_address_map[rm_field][0];
+                        inst_result->dst_effective_reg2 = mod_effective_address_map[rm_field][1];
+                        inst_result->dst_effective_displacement = displacement;
                         // source specified in REG field
-                        instruction.src_type = TYPE_REGISTER;
-                        instruction.src_register = register_map[reg_field][w_bit];
+                        inst_result->src_type = TYPE_REGISTER;
+                        inst_result->src_register = register_map[reg_field][w_bit];
                     }
                 }
                 break;
@@ -585,34 +583,34 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
                 if (has_sr) {
                     if (cmd->sr_is_target) {
                         // Segment register is the destination
-                        instruction.dst_type = TYPE_SEGMENT_REGISTER;
-                        instruction.dst_seg_register = segment_register_map[sr_field];
+                        inst_result->dst_type = TYPE_SEGMENT_REGISTER;
+                        inst_result->dst_seg_register = segment_register_map[sr_field];
                         // Source is specified in RM field
-                        instruction.src_type = TYPE_REGISTER;
-                        instruction.src_register = register_map[rm_field][w_bit];
+                        inst_result->src_type = TYPE_REGISTER;
+                        inst_result->src_register = register_map[rm_field][w_bit];
                     } else {
                         // Segment register is the source
-                        instruction.src_type = TYPE_SEGMENT_REGISTER;
-                        instruction.src_seg_register = segment_register_map[sr_field];
+                        inst_result->src_type = TYPE_SEGMENT_REGISTER;
+                        inst_result->src_seg_register = segment_register_map[sr_field];
                         // Destination is specified in RM field
-                        instruction.dst_type = TYPE_REGISTER;
-                        instruction.dst_register = register_map[rm_field][w_bit];
+                        inst_result->dst_type = TYPE_REGISTER;
+                        inst_result->dst_register = register_map[rm_field][w_bit];
                     }
                 } else {
                     if (d_bit == 0x1) {
                         // destination specificed in REG field
-                        instruction.dst_type = TYPE_REGISTER;
-                        instruction.dst_register = register_map[reg_field][w_bit];
+                        inst_result->dst_type = TYPE_REGISTER;
+                        inst_result->dst_register = register_map[reg_field][w_bit];
                         // Source is specified in RM field
-                        instruction.src_type = TYPE_REGISTER;
-                        instruction.src_register = register_map[rm_field][w_bit];
+                        inst_result->src_type = TYPE_REGISTER;
+                        inst_result->src_register = register_map[rm_field][w_bit];
                     } else {
                         // destination specificed in R/M field
-                        instruction.dst_type = TYPE_REGISTER;
-                        instruction.dst_register = register_map[rm_field][w_bit];
+                        inst_result->dst_type = TYPE_REGISTER;
+                        inst_result->dst_register = register_map[rm_field][w_bit];
                         // source specified in REG field
-                        instruction.src_type = TYPE_REGISTER;
-                        instruction.src_register = register_map[reg_field][w_bit];
+                        inst_result->src_type = TYPE_REGISTER;
+                        inst_result->src_register = register_map[reg_field][w_bit];
                     }
                 }
                 break;
@@ -631,13 +629,13 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
 
     }
 
-    dump_instruction(&instruction);
-    dump_decoded_instruction(&instruction);
+    dump_instruction(inst_result);
+    dump_decoded_instruction(inst_result);
 
     return consumed_bytes;
 }
 
-size_t decode_bitstream(uint8_t *buffer, size_t len, bool verbose) {
+size_t decode_bitstream(uint8_t *buffer, size_t len, bool verbose, struct decoded_instruction_s *inst_result) {
     size_t bytes_available = len;
     size_t bytes_consumed = 0;
     size_t total_consumed = 0;
@@ -653,7 +651,7 @@ size_t decode_bitstream(uint8_t *buffer, size_t len, bool verbose) {
             LOG("; Testing for OP[0x%x]\n", op_cmds[i]->opcode);
             if ( (*ptr & op_cmds[i]->opcode_bitmask) == op_cmds[i]->opcode ) {
                 LOG("; Matched OP[0x%x][%s]\n", op_cmds[i]->opcode, op_cmds[i]->name);
-                bytes_consumed = parse_instruction(ptr, op_cmds[i], verbose);
+                bytes_consumed = parse_instruction(ptr, op_cmds[i], verbose, inst_result);
                 break;
             }
         }

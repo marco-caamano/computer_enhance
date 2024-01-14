@@ -27,6 +27,7 @@ int main (int argc, char *argv[]) {
     size_t bytes_available = 0;
     bool verbose = false;
     FILE *in_fp = NULL;
+    struct decoded_instruction_s instruction = {};
 
     while( (opt = getopt(argc, argv, "hi:v")) != -1) {
         switch (opt) {
@@ -82,7 +83,7 @@ int main (int argc, char *argv[]) {
 
     LOG("Read [%zu] bytes from file\n\n", bytes_available);
 
-    size_t consumed = decode_bitstream(buffer, bytes_available, verbose);
+    size_t consumed = decode_bitstream(buffer, bytes_available, verbose, &instruction);
     if (consumed == bytes_available) {
         LOG("decode_bitstream consumed all %zu bytes from file\n", bytes_available);
     } else {
