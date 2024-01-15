@@ -53,6 +53,7 @@ struct opcode_bitstream_s mov1_op = {
     .byte2_has_mod_field = true,
     .byte2_has_rm_field = true,
     .byte2_has_sr_field = false,
+    .sr_is_target = false,
 };
 
 // 1100011W immediate to register/memory
@@ -74,9 +75,33 @@ struct opcode_bitstream_s mov2_op = {
     .byte2_has_mod_field = true,
     .byte2_has_rm_field = true,
     .byte2_has_sr_field = false,
+    .sr_is_target = false,
+};
+
+// 1011WREG immediate to register
+struct opcode_bitstream_s mov3_op = {
+    .op = MOV_INST,
+    .name = "Immediate to Register MOV",
+    .opcode = 0xB0,
+    .opcode_bitmask = 0xF0,
+    .op_has_register_byte = false,
+    .op_has_opt_disp_bytes = false,
+    .op_has_data_bytes = true,
+    .op_has_address_bytes = false,
+    .byte1_has_d_flag = false,
+    .byte1_has_w_flag = true,
+    .w_flag_shift = 3,
+    .byte1_has_reg_field = true,
+    .byte2_has_reg_field = false,
+    .reg_field_shift = 0,
+    .byte2_has_mod_field = false,
+    .byte2_has_rm_field = false,
+    .byte2_has_sr_field = false,
+    .sr_is_target = false,
 };
 
 struct opcode_bitstream_s *op_cmds[] = {
     &mov1_op,
     &mov2_op,
+    &mov3_op,
 };
