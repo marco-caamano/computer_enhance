@@ -95,6 +95,7 @@ enum operand_type_e {
     TYPE_SEGMENT_REGISTER,      // Source/Destination is a segment register
     TYPE_DIRECT_ADDRESS,        // Source/Destination is a direct address
     TYPE_EFFECTIVE_ADDRESS,     // Source/Destination is an effective address calculation
+    TYPE_DATA,                  // Immediate Data from bitstream
     MAX_TYPE
 };
 
@@ -111,7 +112,8 @@ struct decoded_instruction_s {
     uint16_t src_direct_address;                // Source Register when src_type is TYPE_DIRECT_ADDRESS
     enum register_e src_effective_reg1;         // First Source Register when src_type is TYPE_EFFECTIVE_ADDRESS
     enum register_e src_effective_reg2;         // Second Source Register when src_type is TYPE_EFFECTIVE_ADDRESS
-    uint16_t src_effective_displacement;        // Displacement when src_type is TYPE_EFFECTIVE_ADDRESS
+    int16_t src_effective_displacement;         // Displacement when src_type is TYPE_EFFECTIVE_ADDRESS
+    int16_t src_data;                           // Source Data for command
 
     enum operand_type_e dst_type;               // Destination Type
     enum register_e dst_register;               // Destination Register when dst_type is TYPE_REGISTER
@@ -119,7 +121,8 @@ struct decoded_instruction_s {
     uint16_t dst_direct_address;                // Destination Register when dst_type is TYPE_DIRECT_ADDRESS
     enum register_e dst_effective_reg1;         // First Destination Register when dst_type is TYPE_EFFECTIVE_ADDRESS
     enum register_e dst_effective_reg2;         // Second Destination Register when dst_type is TYPE_EFFECTIVE_ADDRESS
-    uint16_t dst_effective_displacement;        // Displacement when dst_type is TYPE_EFFECTIVE_ADDRESS
+    int16_t dst_effective_displacement;         // Displacement when dst_type is TYPE_EFFECTIVE_ADDRESS
+
 
 };
 

@@ -98,6 +98,7 @@ char *type_str[] = {
     "Segment Register",
     "Direct Address",
     "Effective Address",
+    "Data",
     "Invalid",
 };
 
@@ -117,6 +118,7 @@ void reset_instruction(struct decoded_instruction_s *inst) {
     inst->src_effective_reg1 = MAX_REG;
     inst->src_effective_reg2 = MAX_REG;
     inst->src_effective_displacement = 0;
+    inst->src_data = 0;
     inst->dst_type = MAX_TYPE;
     inst->dst_register = MAX_REG;
     inst->dst_seg_register = MAX_SEG_REG;
@@ -137,6 +139,7 @@ void dump_instruction(struct decoded_instruction_s *inst) {
     LOG("; src_effective_reg1          %s\n", register_name[inst->src_effective_reg1]);
     LOG("; src_effective_reg2          %s\n", register_name[inst->src_effective_reg2]);
     LOG("; src_effective_displacement  0x%04x\n", inst->src_effective_displacement);
+    LOG("; src_data                    0x%04x\n", inst->src_data);
     LOG("; dst_type                    %s\n", type_str[inst->dst_type]);
     LOG("; dst_register                %s\n", register_name[inst->dst_register]);
     LOG("; dst_seg_register            %s\n", segment_register_name[inst->dst_seg_register]);
@@ -241,6 +244,10 @@ void print_decoded_instruction(struct decoded_instruction_s *inst) {
                 }
             }
             break;
+        case TYPE_DATA:
+            snprintf((char *)&src_buffer, STR_BUFFER_SIZE, "%d",
+                inst->src_data);
+            break;
         default:
             ERROR("Invalid src_type[%d] Type\n", inst->src_type);
             break;
@@ -325,6 +332,50 @@ size_t extract_direct_address(uint8_t *ptr, uint16_t *direct_address, size_t pre
     LOG("; [0x%02x] %s Byte - direct_address_high[0x%02x]\n", *ptr, byte_count_str[prev_consumed_bytes], direct_address_high);
     *direct_address = (direct_address_high << 8) | direct_address_low;
     LOG(";        Direct Address [0x%04x][%d]\n", *direct_address, *direct_address);
+
+    return consumed_bytes;
+}
+
+/*
+ * Extract Data from bitstream
+ *
+ * Returns number of bytes consumed, so the caller
+ * can skip ahead to process the next unprocessed bytes
+ * in the buffer
+ */
+int extract_data(uint8_t *ptr, int bit_w, int16_t *data, int prev_consumed_bytes) {
+    int consumed_bytes = 0;
+    uint8_t data_low = 0;
+    uint8_t data_high = 0;
+
+    // consume data_low byte
+    ptr++;
+    consumed_bytes++;
+    prev_consumed_bytes++;
+    data_low = *ptr;
+
+    if (bit_w == 0x0) {
+        // 8 bit data check if we need to do 8bit to 16bit signed extension
+        if ((*ptr>>7) == 0x1 ) {
+            // MSB bit is set, then do signed extension
+            *data = (0xFF<<8) | *ptr;
+            LOG("; [0x%02x] %s Byte - Data[0x%x] signed extended to [%d]\n", *ptr, byte_count_str[prev_consumed_bytes], *ptr, *data);
+        } else {
+            *data = *ptr;
+            LOG("; [0x%02x] %s Byte - Data[0x%x][%d]\n", *ptr,  byte_count_str[prev_consumed_bytes], *data, *data);
+        }
+    } else {
+        // 16 bit data
+        LOG("; [0x%02x] %s Byte - data_low[0x%02x] \n", *ptr, byte_count_str[prev_consumed_bytes], data_low);
+        // consume data_high byte
+        ptr++;
+        consumed_bytes++;
+        prev_consumed_bytes++;
+        data_high = *ptr;
+        LOG("; [0x%02x] %s Byte - data_high[0x%02x]\n", *ptr, byte_count_str[prev_consumed_bytes], data_high);
+        *data = (data_high << 8) | data_low;
+        LOG(";        Data [0x%04x][%d]\n", *data, *data);
+    }
 
     return consumed_bytes;
 }
@@ -557,14 +608,21 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
                 }
             }
         }
+    } else if (has_reg && has_w_bit) {
+        // There is no MOD field, but there is a REG field and w_bit
+        // destination specificed in REG field
+        inst_result->dst_type = TYPE_REGISTER;
+        inst_result->dst_register = register_map[reg_field][w_bit];
+        // Source is Direct Data from the bitstream
+        inst_result->src_type = TYPE_DATA;
     }
 
-    if (cmd->op_has_opt_disp_bytes) {
-
-    }
 
     if (cmd->op_has_data_bytes) {
-
+        // extract data
+        consumed = extract_data(ptr, w_bit, &inst_result->src_data, consumed_bytes);
+        consumed_bytes += consumed;
+        ptr += consumed;
     }
 
     if (cmd->op_has_address_bytes) {
@@ -579,7 +637,7 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
 size_t decode_bitstream(uint8_t *ptr, size_t bytes_available, bool verbose, struct decoded_instruction_s *inst_result) {
     size_t op_cmd_size = sizeof(op_cmds) / sizeof(struct opcode_bitstream_s *);
 
-    LOG("; [%s:%d] ptr[%p] bytes_available[%zu] verbose[%s]\n\n", __FUNCTION__, __LINE__, ptr, bytes_available, verbose ? "True" : "False");
+    LOG("\n; [%s:%d] ptr[%p] bytes_available[%zu] verbose[%s]\n", __FUNCTION__, __LINE__, ptr, bytes_available, verbose ? "True" : "False");
 
     LOG("; Testing byte[0x%x] for 8086 instructions\n", *ptr);
     for (size_t i=0; i<op_cmd_size; i++) {
