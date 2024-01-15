@@ -735,15 +735,25 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
         ptr += consumed;
     }
 
-    if (cmd->op_has_hardcoded_dst && cmd->op_has_address_bytes) {
+    if (cmd->op_has_hardcoded_dst) {
         // OP has a hardcoded destination
         inst_result->dst_type = TYPE_REGISTER;
-        inst_result->dst_register = cmd->hard_dst_reg;
-        // source is the direct address
-        inst_result->src_type = TYPE_DIRECT_ADDRESS;
-        consumed = extract_direct_address(ptr, &inst_result->src_direct_address, consumed_bytes);
-        consumed_bytes += consumed;
-        ptr += consumed;
+        if (has_w_bit && w_bit==0x0 && cmd->hard_dst_reg<REG_SP) {
+            // Add 1 offset to target low byte of the register
+            inst_result->dst_register = cmd->hard_dst_reg + 1;
+        } else {
+            inst_result->dst_register = cmd->hard_dst_reg;
+        }
+        if (cmd->op_has_address_bytes) {
+            // source is the direct address
+            inst_result->src_type = TYPE_DIRECT_ADDRESS;
+            consumed = extract_direct_address(ptr, &inst_result->src_direct_address, consumed_bytes);
+            consumed_bytes += consumed;
+            ptr += consumed;
+        } else if (cmd->op_has_data_bytes) {
+            // Source is Data
+            inst_result->src_type = TYPE_DATA;
+        }
     }
 
     if (cmd->op_has_hardcoded_src && cmd->op_has_address_bytes) {

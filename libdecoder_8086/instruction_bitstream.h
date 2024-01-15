@@ -237,6 +237,34 @@ struct opcode_bitstream_s multi1_op = {
     .hard_src_reg = MAX_REG,
 };
 
+//  0000010W Immediate to Accumulator ADD
+struct opcode_bitstream_s add2_op = {
+    .op = ADD_INST,
+    .name = "Immediate to Accumulator ADD",
+    .opcode = 0x04,
+    .opcode_bitmask = 0xFE,
+    .op_has_register_byte = false,
+    .op_has_opt_disp_bytes = false,
+    .op_has_data_bytes = true,
+    .op_has_address_bytes = false,
+    .byte1_has_d_flag = false,
+    .byte1_has_s_flag = false,
+    .byte1_has_w_flag = true,
+    .w_flag_shift = 0,
+    .byte1_has_reg_field = false,
+    .byte2_has_reg_field = false,
+    .reg_field_shift = 0,
+    .byte2_has_mod_field = false,
+    .byte2_has_rm_field = false,
+    .byte2_has_sr_field = false,
+    .byte2_has_op_encode_field = false,
+    .sr_is_target = false,
+    .op_has_hardcoded_dst = true,
+    .hard_dst_reg = REG_AX,
+    .op_has_hardcoded_src = false,
+    .hard_src_reg = MAX_REG,
+};
+
 struct opcode_bitstream_s *op_cmds[] = {
     &mov1_op,
     &mov2_op,
@@ -245,4 +273,5 @@ struct opcode_bitstream_s *op_cmds[] = {
     &mov5_op,
     &add1_op,
     &multi1_op,
+    &add2_op,
 };
