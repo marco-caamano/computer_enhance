@@ -12,6 +12,36 @@
 // This must match against instructions_e enum
 const char *instruction_name[] = {
     "mov",
+    "add",
+    "sub",
+    "cmp"
+};
+
+/*
+ * Some Operations have the same signature but differ
+ * in the op_encoding in the 2nd byte (3bits replaceing REG field)
+ * 
+ * OP Mappings
+ * 000 ADD
+ * 001 MAX_INST - so far unknown
+ * 010 ADC
+ * 011 SBB
+ * 100 MAX_INST - so far unknown
+ * 101 SUB
+ * 110 MAX_INST - so far unknown
+ * 111 CMP
+ * 
+ * Mapping Just ADD, SUB and CMP
+ */
+const enum instructions_e op_encoding[] = {
+    ADD_INST,   // ADD
+    MAX_INST,   // Unknown
+    MAX_INST,   // ADC
+    MAX_INST,   // SBB
+    MAX_INST,   // Unknown
+    SUB_INST,   // SUB
+    MAX_INST,   // Unkown
+    CMP_INST,   // CMP
 };
 
 const char *register_name[] = {
@@ -410,12 +440,15 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
     size_t consumed_bytes = 1;
     size_t consumed = 0;
     uint8_t d_bit = 0;
+    uint8_t s_bit = 0;
     uint8_t w_bit = 0;
     uint8_t reg_field = 0;
+    uint8_t op_encode_field = 0;
     uint8_t mod_field = 0;
     uint8_t rm_field = 0;
     uint8_t sr_field = 0;
     bool has_d_bit = false;
+    bool has_s_bit = false;
     bool has_w_bit = false;
     bool has_mod = false;
     bool has_reg = false;
@@ -428,7 +461,13 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
 
     verbose = is_verbose;
 
-    LOG("; [0x%02x] %s Byte - Found Op[%s][%s] ", *ptr, byte_count_str[consumed_bytes], instruction_name[cmd->op], cmd->name);
+    if (cmd->byte2_has_op_encode_field) {
+        // multi-instruction it is mapped on op_code in 2nd Byte
+        LOG("; [0x%02x] %s Byte - Found [%s] Op ", *ptr, byte_count_str[consumed_bytes], cmd->name);
+    } else {
+        // regular instruction
+        LOG("; [0x%02x] %s Byte - Found Op[%s][%s] ", *ptr, byte_count_str[consumed_bytes], instruction_name[cmd->op], cmd->name);
+    }
 
     inst_result->op = cmd->op;
     inst_result->name = cmd->name;
@@ -438,6 +477,11 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
         d_bit = (*ptr >> D_BIT_SHIFT ) & BIT_FLAG;
         has_d_bit = true;
         LOG("D[%d] ", d_bit);
+    }
+    if (cmd->byte1_has_s_flag) {
+        s_bit = (*ptr >> D_BIT_SHIFT ) & BIT_FLAG;
+        has_s_bit = true;
+        LOG("S[%d] ", s_bit);
     }
     if (cmd->byte1_has_w_flag) {
         w_bit = (*ptr >> cmd->w_flag_shift) & BIT_FLAG;
@@ -466,6 +510,11 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
             has_reg = true;
             LOG("REG[0x%x] ", reg_field);
         }
+        if (cmd->byte2_has_op_encode_field) {
+            op_encode_field = (*ptr >> OP_ENCODE_SHIFT) & OP_ENCODE_MASK;
+            inst_result->op = op_encoding[op_encode_field];
+            LOG("OP_ENCODE[0x%x][%s] ", op_encode_field, instruction_name[inst_result->op]);
+        }
         if (cmd->byte2_has_rm_field) {
             rm_field = (*ptr >> RM_FIELD_SHIFT) & RM_FIELD_MASK;
             has_rm = true;
@@ -480,6 +529,7 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
     }
 
     LOG("; has_d_bit[%s] ", has_d_bit ? "True" : "False");
+    LOG(" has_s_bit[%s] ", has_s_bit ? "True" : "False");
     LOG(" has_w_bit[%s] ", has_w_bit ? "True" : "False");
     LOG(" has_mod[%s] ", has_mod ? "True" : "False");
     LOG(" has_reg[%s] ", has_reg ? "True" : "False");
@@ -568,20 +618,29 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
                     inst_result->dst_register = register_map[rm_field][w_bit];
                 }
             } else {
-                if (d_bit == 0x1) {
-                    // destination specificed in REG field
-                    inst_result->dst_type = TYPE_REGISTER;
-                    inst_result->dst_register = register_map[reg_field][w_bit];
-                    // Source is specified in RM field
-                    inst_result->src_type = TYPE_REGISTER;
-                    inst_result->src_register = register_map[rm_field][w_bit];
+                if (has_d_bit) {
+                    if (d_bit == 0x1) {
+                        // destination specificed in REG field
+                        inst_result->dst_type = TYPE_REGISTER;
+                        inst_result->dst_register = register_map[reg_field][w_bit];
+                        // Source is specified in RM field
+                        inst_result->src_type = TYPE_REGISTER;
+                        inst_result->src_register = register_map[rm_field][w_bit];
+                    } else {
+                        // destination specificed in R/M field
+                        inst_result->dst_type = TYPE_REGISTER;
+                        inst_result->dst_register = register_map[rm_field][w_bit];
+                        // source specified in REG field
+                        inst_result->src_type = TYPE_REGISTER;
+                        inst_result->src_register = register_map[reg_field][w_bit];
+                    }
                 } else {
+                    // no d_bit then dst is specified in RM
                     // destination specificed in R/M field
                     inst_result->dst_type = TYPE_REGISTER;
                     inst_result->dst_register = register_map[rm_field][w_bit];
-                    // source specified in REG field
-                    inst_result->src_type = TYPE_REGISTER;
-                    inst_result->src_register = register_map[reg_field][w_bit];
+                    // Source is Data
+                    inst_result->src_type = TYPE_DATA;
                 }
             }
         } else {
@@ -654,13 +713,24 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
 
 
     if (cmd->op_has_data_bytes) {
-        if (w_bit == 0x1) {
-            inst_result->src_data_is_16bit = true;
+        uint8_t extract_2bytes = w_bit;
+        if (has_s_bit) {
+            // special case we must see the combination of s_bit and w_bit
+            if (s_bit==0x0 && w_bit==0x1) {
+                inst_result->src_data_is_16bit = true;
+            } else {
+                extract_2bytes = 0x0;
+                inst_result->src_data_is_16bit = false;
+            }
         } else {
-            inst_result->src_data_is_16bit = false;
+            if (w_bit == 0x1) {
+                inst_result->src_data_is_16bit = true;
+            } else {
+                inst_result->src_data_is_16bit = false;
+            }
         }
         // extract data
-        consumed = extract_data(ptr, w_bit, &inst_result->src_data, consumed_bytes);
+        consumed = extract_data(ptr, extract_2bytes, &inst_result->src_data, consumed_bytes);
         consumed_bytes += consumed;
         ptr += consumed;
     }

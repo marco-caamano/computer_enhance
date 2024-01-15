@@ -18,6 +18,7 @@ struct opcode_bitstream_s {
     const bool op_has_address_bytes;        // operation has 2 bytes for direct address
 
     const bool byte1_has_d_flag;            // D Flag is present in byte1
+    const bool byte1_has_s_flag;            // S Flag is present in byte1
 
     const bool byte1_has_w_flag;            // W Flag is present in byte1
     const uint8_t w_flag_shift;             // Shift for W Flag
@@ -29,6 +30,7 @@ struct opcode_bitstream_s {
     const bool byte2_has_mod_field;         // MOD field is present in byte2 | Shift is always the same
     const bool byte2_has_rm_field;          // RM field is present in byte2 | Shift is always the same
     const bool byte2_has_sr_field;          // SR segment field is present in byte2 | Shift is always the same
+    const bool byte2_has_op_encode_field;   // OP Encode Field (ADD/SUB/CMP) is present in byte2 | Shift is always the same
 
     const bool sr_is_target;                // When type is Segment Register is the destination the segment register
 
@@ -50,6 +52,7 @@ struct opcode_bitstream_s mov1_op = {
     .op_has_data_bytes = false,
     .op_has_address_bytes = false,
     .byte1_has_d_flag = true,
+    .byte1_has_s_flag = false,
     .byte1_has_w_flag = true,
     .w_flag_shift = 0,
     .byte1_has_reg_field = false,
@@ -58,6 +61,7 @@ struct opcode_bitstream_s mov1_op = {
     .byte2_has_mod_field = true,
     .byte2_has_rm_field = true,
     .byte2_has_sr_field = false,
+    .byte2_has_op_encode_field = false,
     .sr_is_target = false,
     .op_has_hardcoded_dst = false,
     .hard_dst_reg = MAX_REG,
@@ -76,6 +80,7 @@ struct opcode_bitstream_s mov2_op = {
     .op_has_data_bytes = true,
     .op_has_address_bytes = false,
     .byte1_has_d_flag = false,
+    .byte1_has_s_flag = false,
     .byte1_has_w_flag = true,
     .w_flag_shift = 0,
     .byte1_has_reg_field = false,
@@ -84,6 +89,7 @@ struct opcode_bitstream_s mov2_op = {
     .byte2_has_mod_field = true,
     .byte2_has_rm_field = true,
     .byte2_has_sr_field = false,
+    .byte2_has_op_encode_field = false,
     .sr_is_target = false,
     .op_has_hardcoded_dst = false,
     .hard_dst_reg = MAX_REG,
@@ -102,6 +108,7 @@ struct opcode_bitstream_s mov3_op = {
     .op_has_data_bytes = true,
     .op_has_address_bytes = false,
     .byte1_has_d_flag = false,
+    .byte1_has_s_flag = false,
     .byte1_has_w_flag = true,
     .w_flag_shift = 3,
     .byte1_has_reg_field = true,
@@ -110,6 +117,7 @@ struct opcode_bitstream_s mov3_op = {
     .byte2_has_mod_field = false,
     .byte2_has_rm_field = false,
     .byte2_has_sr_field = false,
+    .byte2_has_op_encode_field = false,
     .sr_is_target = false,
     .op_has_hardcoded_dst = false,
     .hard_dst_reg = MAX_REG,
@@ -128,6 +136,7 @@ struct opcode_bitstream_s mov4_op = {
     .op_has_data_bytes = false,
     .op_has_address_bytes = true,
     .byte1_has_d_flag = false,
+    .byte1_has_s_flag = false,
     .byte1_has_w_flag = true,
     .w_flag_shift = 0,
     .byte1_has_reg_field = false,
@@ -136,6 +145,7 @@ struct opcode_bitstream_s mov4_op = {
     .byte2_has_mod_field = false,
     .byte2_has_rm_field = false,
     .byte2_has_sr_field = false,
+    .byte2_has_op_encode_field = false,
     .sr_is_target = false,
     .op_has_hardcoded_dst = true,
     .hard_dst_reg = REG_AX,
@@ -154,6 +164,7 @@ struct opcode_bitstream_s mov5_op = {
     .op_has_data_bytes = false,
     .op_has_address_bytes = true,
     .byte1_has_d_flag = false,
+    .byte1_has_s_flag = false,
     .byte1_has_w_flag = true,
     .w_flag_shift = 0,
     .byte1_has_reg_field = false,
@@ -162,6 +173,7 @@ struct opcode_bitstream_s mov5_op = {
     .byte2_has_mod_field = false,
     .byte2_has_rm_field = false,
     .byte2_has_sr_field = false,
+    .byte2_has_op_encode_field = false,
     .sr_is_target = false,
     .op_has_hardcoded_dst = false,
     .hard_dst_reg = MAX_REG,
@@ -169,6 +181,61 @@ struct opcode_bitstream_s mov5_op = {
     .hard_src_reg = REG_AX,
 };
 
+// 000000DW Add Reg/Memory with register to either
+struct opcode_bitstream_s add1_op = {
+    .op = ADD_INST,
+    .name = "Reg/Memory with register to either ADD",
+    .opcode = 0x00,
+    .opcode_bitmask = 0xFC,
+    .op_has_register_byte = true,
+    .op_has_opt_disp_bytes = true,
+    .op_has_data_bytes = false,
+    .op_has_address_bytes = false,
+    .byte1_has_d_flag = true,
+    .byte1_has_s_flag = false,
+    .byte1_has_w_flag = true,
+    .w_flag_shift = 0,
+    .byte1_has_reg_field = false,
+    .byte2_has_reg_field = true,
+    .reg_field_shift = 3,
+    .byte2_has_mod_field = true,
+    .byte2_has_rm_field = true,
+    .byte2_has_sr_field = false,
+    .byte2_has_op_encode_field = false,
+    .sr_is_target = false,
+    .op_has_hardcoded_dst = false,
+    .hard_dst_reg = MAX_REG,
+    .op_has_hardcoded_src = false,
+    .hard_src_reg = MAX_REG,
+};
+
+// 100000SW Immediate to Register/Memory ADD/SUB/CMP
+struct opcode_bitstream_s multi1_op = {
+    .op = MAX_INST,
+    .name = "Immediate to register/memory MultiInstruction ADD/SUB/CMP",
+    .opcode = 0x80,
+    .opcode_bitmask = 0xFC,
+    .op_has_register_byte = true,
+    .op_has_opt_disp_bytes = true,
+    .op_has_data_bytes = true,
+    .op_has_address_bytes = false,
+    .byte1_has_d_flag = false,
+    .byte1_has_s_flag = true,
+    .byte1_has_w_flag = true,
+    .w_flag_shift = 0,
+    .byte1_has_reg_field = false,
+    .byte2_has_reg_field = false,
+    .reg_field_shift = 3,
+    .byte2_has_mod_field = true,
+    .byte2_has_rm_field = true,
+    .byte2_has_sr_field = false,
+    .byte2_has_op_encode_field = true,
+    .sr_is_target = false,
+    .op_has_hardcoded_dst = false,
+    .hard_dst_reg = MAX_REG,
+    .op_has_hardcoded_src = false,
+    .hard_src_reg = MAX_REG,
+};
 
 struct opcode_bitstream_s *op_cmds[] = {
     &mov1_op,
@@ -176,4 +243,6 @@ struct opcode_bitstream_s *op_cmds[] = {
     &mov3_op,
     &mov4_op,
     &mov5_op,
+    &add1_op,
+    &multi1_op,
 };

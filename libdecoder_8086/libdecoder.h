@@ -33,9 +33,12 @@
 
 #define BIT_FLAG        0x1
 #define D_BIT_SHIFT     1
+#define S_BIT_SHIFT     1
 #define MOD_FIELD_MASK  0x3
 #define MOD_FIELD_SHIFT 6
 #define REG_FIELD_MASK  0x7
+#define OP_ENCODE_SHIFT 3
+#define OP_ENCODE_MASK  0x7
 #define RM_FIELD_MASK   0x7
 #define RM_FIELD_SHIFT  0
 #define SR_FIELD_MASK   0x3
@@ -84,6 +87,9 @@ enum segment_register_e {
  */
 enum instructions_e {
     MOV_INST,   // mov op
+    ADD_INST,   // add op
+    SUB_INST,   // sub op
+    CMP_INST,   // cmp
     MAX_INST
 };
 

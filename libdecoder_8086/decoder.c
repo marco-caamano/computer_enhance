@@ -24,7 +24,7 @@ int main (int argc, char *argv[]) {
     int opt;
     char *input_file = NULL;
     uint8_t *buffer = NULL;
-    size_t bytes_available = 0;
+    ssize_t bytes_available = 0;
     bool verbose = false;
     FILE *in_fp = NULL;
     struct decoded_instruction_s instruction = {};
@@ -100,6 +100,7 @@ int main (int argc, char *argv[]) {
 
         // print the instruction
         print_decoded_instruction(&instruction);
+        LOG("; consumed [%zu]bytes | bytes_available [%zi]bytes\n", consumed, bytes_available);
 
     }
     
