@@ -172,10 +172,15 @@ void print_decoded_instruction(struct decoded_instruction_s *inst) {
             if (inst->dst_effective_reg2<MAX_REG) {
                 // we have a valid second effective register
                 if (inst->dst_effective_displacement != 0) {
+                    char *op = "+";
+                    if (inst->dst_effective_displacement<0) {
+                        op = "-";
+                    }
                     snprintf((char *)&dst_buffer, STR_BUFFER_SIZE, 
-                        "[ %s + %s + %d ]", 
+                        "[ %s + %s %s %d ]",
                         register_name[inst->dst_effective_reg1],
                         register_name[inst->dst_effective_reg2],
+                        op,
                         inst->dst_effective_displacement);
                 } else {
                     snprintf((char *)&dst_buffer, STR_BUFFER_SIZE,
@@ -186,9 +191,14 @@ void print_decoded_instruction(struct decoded_instruction_s *inst) {
             } else {
                 // we only have the first effective register
                 if (inst->dst_effective_displacement != 0) {
+                    char *op = "+";
+                    if (inst->dst_effective_displacement<0) {
+                        op = "";
+                    }
                     snprintf((char *)&dst_buffer, STR_BUFFER_SIZE,
-                        "[ %s + %d ]", 
+                        "[ %s %s %d ]",
                         register_name[inst->dst_effective_reg1],
+                        op,
                         inst->dst_effective_displacement);
                 } else {
                     snprintf((char *)&dst_buffer, STR_BUFFER_SIZE,
@@ -219,10 +229,15 @@ void print_decoded_instruction(struct decoded_instruction_s *inst) {
             if (inst->src_effective_reg2<MAX_REG) {
                 // we have a valid second effective register
                 if (inst->src_effective_displacement != 0) {
+                    char *op = "+";
+                    if (inst->src_effective_displacement<0) {
+                        op = "";
+                    }
                     snprintf((char *)&src_buffer, STR_BUFFER_SIZE,
-                        "[ %s + %s + %d ]", 
+                        "[ %s + %s %s %d ]",
                         register_name[inst->src_effective_reg1],
                         register_name[inst->src_effective_reg2],
+                        op,
                         inst->src_effective_displacement);
                 } else {
                     snprintf((char *)&src_buffer, STR_BUFFER_SIZE,
@@ -233,9 +248,14 @@ void print_decoded_instruction(struct decoded_instruction_s *inst) {
             } else {
                 // we only have the first effective register
                 if (inst->src_effective_displacement != 0) {
+                    char *op = "+";
+                    if (inst->src_effective_displacement<0) {
+                        op = "";
+                    }
                     snprintf((char *)&src_buffer, STR_BUFFER_SIZE,
-                        "[ %s + %d ]", 
+                        "[ %s %s %d ]",
                         register_name[inst->src_effective_reg1],
+                        op,
                         inst->src_effective_displacement);
                 } else {
                     snprintf((char *)&src_buffer, STR_BUFFER_SIZE,
