@@ -119,6 +119,7 @@ void reset_instruction(struct decoded_instruction_s *inst) {
     inst->src_effective_reg2 = MAX_REG;
     inst->src_effective_displacement = 0;
     inst->src_data = 0;
+    inst->src_data_is_16bit = false;
     inst->dst_type = MAX_TYPE;
     inst->dst_register = MAX_REG;
     inst->dst_seg_register = MAX_SEG_REG;
@@ -140,6 +141,7 @@ void dump_instruction(struct decoded_instruction_s *inst) {
     LOG("; src_effective_reg2          %s\n", register_name[inst->src_effective_reg2]);
     LOG("; src_effective_displacement  0x%04x\n", inst->src_effective_displacement);
     LOG("; src_data                    0x%04x\n", inst->src_data);
+    LOG("; src_data_is_16bit           %s\n", inst->src_data_is_16bit ? "True" : "False");
     LOG("; dst_type                    %s\n", type_str[inst->dst_type]);
     LOG("; dst_register                %s\n", register_name[inst->dst_register]);
     LOG("; dst_seg_register            %s\n", segment_register_name[inst->dst_seg_register]);
@@ -265,8 +267,12 @@ void print_decoded_instruction(struct decoded_instruction_s *inst) {
             }
             break;
         case TYPE_DATA:
-            snprintf((char *)&src_buffer, STR_BUFFER_SIZE, "%d",
-                inst->src_data);
+            char *data_type = "byte";
+            if (inst->src_data_is_16bit) {
+                data_type = "word";
+            }
+            snprintf((char *)&src_buffer, STR_BUFFER_SIZE, "%s %d",
+                data_type, inst->src_data);
             break;
         default:
             ERROR("Invalid src_type[%d] Type\n", inst->src_type);
@@ -606,7 +612,7 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
                     inst_result->dst_effective_reg2 = mod_effective_address_map[rm_field][1];
                     inst_result->dst_effective_displacement = displacement;
                 }
-            } else {
+            } else if (has_d_bit) {
                 if (d_bit == 0x1) {
                     // destination specificed in REG field
                     inst_result->dst_type = TYPE_REGISTER;
@@ -626,6 +632,15 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
                     inst_result->src_type = TYPE_REGISTER;
                     inst_result->src_register = register_map[reg_field][w_bit];
                 }
+            } else if (!has_d_bit && !has_reg && cmd->op_has_data_bytes) {
+                // OP has destination in R/M field and source is the data
+                // destination specificed in R/M field
+                inst_result->dst_type = TYPE_EFFECTIVE_ADDRESS;
+                inst_result->dst_effective_reg1 = mod_effective_address_map[rm_field][0];
+                inst_result->dst_effective_reg2 = mod_effective_address_map[rm_field][1];
+                inst_result->dst_effective_displacement = displacement;
+                // source is the data
+                inst_result->src_type = TYPE_DATA;
             }
         }
     } else if (has_reg && has_w_bit) {
@@ -639,6 +654,11 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
 
 
     if (cmd->op_has_data_bytes) {
+        if (w_bit == 0x1) {
+            inst_result->src_data_is_16bit = true;
+        } else {
+            inst_result->src_data_is_16bit = false;
+        }
         // extract data
         consumed = extract_data(ptr, w_bit, &inst_result->src_data, consumed_bytes);
         consumed_bytes += consumed;

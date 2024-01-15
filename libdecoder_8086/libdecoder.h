@@ -114,6 +114,7 @@ struct decoded_instruction_s {
     enum register_e src_effective_reg2;         // Second Source Register when src_type is TYPE_EFFECTIVE_ADDRESS
     int16_t src_effective_displacement;         // Displacement when src_type is TYPE_EFFECTIVE_ADDRESS
     int16_t src_data;                           // Source Data for command
+    bool src_data_is_16bit;                     // Source Data is 16bit
 
     enum operand_type_e dst_type;               // Destination Type
     enum register_e dst_register;               // Destination Register when dst_type is TYPE_REGISTER
