@@ -149,7 +149,8 @@ void reset_instruction(struct decoded_instruction_s *inst) {
     inst->src_effective_reg2 = MAX_REG;
     inst->src_effective_displacement = 0;
     inst->src_data = 0;
-    inst->src_data_is_16bit = false;
+    inst->src_needs_byte_decorator = false;
+    inst->src_needs_word_decorator = false;
     inst->dst_type = MAX_TYPE;
     inst->dst_register = MAX_REG;
     inst->dst_seg_register = MAX_SEG_REG;
@@ -157,6 +158,8 @@ void reset_instruction(struct decoded_instruction_s *inst) {
     inst->dst_effective_reg1 = MAX_REG;
     inst->dst_effective_reg2 = MAX_REG;
     inst->dst_effective_displacement = 0;
+    inst->dst_needs_byte_decorator = false;
+    inst->dst_needs_word_decorator = false;
 }
 
 void dump_instruction(struct decoded_instruction_s *inst) {
@@ -171,7 +174,8 @@ void dump_instruction(struct decoded_instruction_s *inst) {
     LOG("; src_effective_reg2          %s\n", register_name[inst->src_effective_reg2]);
     LOG("; src_effective_displacement  0x%04x\n", inst->src_effective_displacement);
     LOG("; src_data                    0x%04x\n", inst->src_data);
-    LOG("; src_data_is_16bit           %s\n", inst->src_data_is_16bit ? "True" : "False");
+    LOG("; src_needs_byte_decorator    %s\n", inst->src_needs_byte_decorator ? "True" : "False");
+    LOG("; src_needs_word_decorator    %s\n", inst->src_needs_word_decorator ? "True" : "False");
     LOG("; dst_type                    %s\n", type_str[inst->dst_type]);
     LOG("; dst_register                %s\n", register_name[inst->dst_register]);
     LOG("; dst_seg_register            %s\n", segment_register_name[inst->dst_seg_register]);
@@ -179,6 +183,8 @@ void dump_instruction(struct decoded_instruction_s *inst) {
     LOG("; dst_effective_reg1          %s\n", register_name[inst->dst_effective_reg1]);
     LOG("; dst_effective_reg2          %s\n", register_name[inst->dst_effective_reg2]);
     LOG("; dst_effective_displacement  0x%04x\n", inst->dst_effective_displacement);
+    LOG("; dst_needs_byte_decorator    %s\n", inst->dst_needs_byte_decorator ? "True" : "False");
+    LOG("; dst_needs_word_decorator    %s\n", inst->dst_needs_word_decorator ? "True" : "False");
 }
 
 
@@ -297,22 +303,65 @@ void print_decoded_instruction(struct decoded_instruction_s *inst) {
             }
             break;
         case TYPE_DATA:
-            char *data_type = "byte";
-            if (inst->src_data_is_16bit) {
-                data_type = "word";
-            }
-            snprintf((char *)&src_buffer, STR_BUFFER_SIZE, "%s %d",
-                data_type, inst->src_data);
+            snprintf((char *)&src_buffer, STR_BUFFER_SIZE, "%d",
+                inst->src_data);
             break;
         default:
             ERROR("Invalid src_type[%d] Type\n", inst->src_type);
             break;
     }
+    char *src_decorator = "";
+    char *dst_decorator = "";
+    if (inst->src_needs_byte_decorator) {
+        src_decorator = "byte ";
+    } else if (inst->src_needs_word_decorator) {
+        src_decorator = "word ";
+    }
+    if (inst->dst_needs_byte_decorator) {
+        dst_decorator = "byte ";
+    } else if (inst->dst_needs_word_decorator) {
+        dst_decorator = "word ";
+    }
 
     // put it all together
-    snprintf((char *)&dump_buffer, DUMP_STR_BUFFER_SIZE, "%s %s, %s", 
-        instruction_name[inst->op], dst_buffer, src_buffer);
+    snprintf((char *)&dump_buffer, DUMP_STR_BUFFER_SIZE, "%s %s%s, %s%s", 
+        instruction_name[inst->op], dst_decorator, dst_buffer, src_decorator, src_buffer);
     printf("%s\n", dump_buffer);
+}
+
+bool is_dst_16bit(struct decoded_instruction_s *inst) {
+    // the only 8bit destination address are dst_type TYPE_REGISTER and the low or high registers
+    switch (inst->dst_type) {
+        case TYPE_REGISTER:
+            switch (inst->dst_register) {
+                case REG_AX:
+                case REG_BX:
+                case REG_CX:
+                case REG_DX:
+                case REG_SP:
+                case REG_BP:
+                case REG_SI:
+                case REG_DI:
+                    return true;
+                    break;
+                default:
+                    // this catches all AL, AH, BL, ...
+                    return false;
+                    break;
+            }
+            break;
+        case TYPE_SEGMENT_REGISTER:
+        case TYPE_DIRECT_ADDRESS:
+        case TYPE_EFFECTIVE_ADDRESS:
+            return true;
+            break;
+        case TYPE_DATA:
+            ERROR("Sanity Error: TYPE_DATA is an Invalid dst_type\n");
+            break;
+        default:
+            ERROR("Sanity Error: Invalid dst_type[%d]\n", inst->dst_type);
+            break;
+    }
 }
 
 /*
@@ -399,7 +448,7 @@ size_t extract_direct_address(uint8_t *ptr, uint16_t *direct_address, size_t pre
  * can skip ahead to process the next unprocessed bytes
  * in the buffer
  */
-int extract_data(uint8_t *ptr, int bit_w, int16_t *data, int prev_consumed_bytes) {
+int extract_data(uint8_t *ptr, bool is_8bit, bool is_signed_extended, int16_t *data, int prev_consumed_bytes) {
     int consumed_bytes = 0;
     uint8_t data_low = 0;
     uint8_t data_high = 0;
@@ -410,13 +459,20 @@ int extract_data(uint8_t *ptr, int bit_w, int16_t *data, int prev_consumed_bytes
     prev_consumed_bytes++;
     data_low = *ptr;
 
-    if (bit_w == 0x0) {
-        // 8 bit data check if we need to do 8bit to 16bit signed extension
-        if ((*ptr>>7) == 0x1 ) {
-            // MSB bit is set, then do signed extension
-            *data = (0xFF<<8) | *ptr;
-            LOG("; [0x%02x] %s Byte - Data[0x%x] signed extended to [%d]\n", *ptr, byte_count_str[prev_consumed_bytes], *ptr, *data);
+    if (is_8bit) {
+        if (is_signed_extended) {
+            // Read 8bits, sign extend
+            // 8 bit data check if we need to do 8bit to 16bit signed extension
+            if ((*ptr>>7) == 0x1 ) {
+                // MSB bit is set, then do signed extension
+                *data = (0xFF<<8) | *ptr;
+                LOG("; [0x%02x] %s Byte - Data[0x%x] signed extended to [%d]\n", *ptr, byte_count_str[prev_consumed_bytes], *ptr, *data);
+            } else {
+                *data = *ptr;
+                LOG("; [0x%02x] %s Byte - Data[0x%x][%d]\n", *ptr,  byte_count_str[prev_consumed_bytes], *data, *data);
+            }
         } else {
+            // Read 8bits no sign extension
             *data = *ptr;
             LOG("; [0x%02x] %s Byte - Data[0x%x][%d]\n", *ptr,  byte_count_str[prev_consumed_bytes], *data, *data);
         }
@@ -711,30 +767,6 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
         inst_result->src_type = TYPE_DATA;
     }
 
-
-    if (cmd->op_has_data_bytes) {
-        uint8_t extract_2bytes = w_bit;
-        if (has_s_bit) {
-            // special case we must see the combination of s_bit and w_bit
-            if (s_bit==0x0 && w_bit==0x1) {
-                inst_result->src_data_is_16bit = true;
-            } else {
-                extract_2bytes = 0x0;
-                inst_result->src_data_is_16bit = false;
-            }
-        } else {
-            if (w_bit == 0x1) {
-                inst_result->src_data_is_16bit = true;
-            } else {
-                inst_result->src_data_is_16bit = false;
-            }
-        }
-        // extract data
-        consumed = extract_data(ptr, extract_2bytes, &inst_result->src_data, consumed_bytes);
-        consumed_bytes += consumed;
-        ptr += consumed;
-    }
-
     if (cmd->op_has_hardcoded_dst) {
         // OP has a hardcoded destination
         inst_result->dst_type = TYPE_REGISTER;
@@ -763,6 +795,79 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
         // source is the direct address
         inst_result->dst_type = TYPE_DIRECT_ADDRESS;
         consumed = extract_direct_address(ptr, &inst_result->dst_direct_address, consumed_bytes);
+        consumed_bytes += consumed;
+        ptr += consumed;
+    }
+
+    // we leave the data_bytes check to the end
+    // as we depend on decisions made before this point
+    if (cmd->op_has_data_bytes) {
+        bool is_8bit = false;
+        bool is_signed_extended = false;
+        if (!has_w_bit) {
+            ERROR("Sanity Check failed, op_has_data_bytes is True but OP does not have a W bit\n");
+        }
+        if (has_s_bit) {
+            /* 
+             * When S Bit is present we have the following cases
+             * S W
+             * 0 0  unsigned  8bit data -> no sign extension
+             * 0 1  unsigned 16bit data
+             * 1 0  signed    8bit data -> sign extend
+             * 1 1  signed   16bit data
+             */
+            uint8_t sw_field = (s_bit<<1) | w_bit;
+            switch (sw_field) {
+                case 0x0:
+                    // 0 0  unsigned  8bit data -> no sign extension
+                    is_8bit = true;
+                    is_signed_extended = false;
+                    if (is_dst_16bit(inst_result)) {
+                        inst_result->dst_needs_byte_decorator = true;
+                    }
+                    break;
+                case 0x1:
+                    // 0 1  unsigned 16bit data
+                    is_8bit = false;
+                    is_signed_extended = false;
+                    break;
+                case 0x2:
+                    // 1 0  signed 8bit data -> sign extend
+                    is_8bit = true;
+                    is_signed_extended = true;
+                    break;
+                case 0x3:
+                    // 1 1  signed 16bit data, but only 8bit in the bitstream
+                    is_8bit = true;
+                    is_signed_extended = true;
+                    if (is_dst_16bit(inst_result)) {
+                        inst_result->dst_needs_word_decorator = true;
+                    }
+                    break;
+                default:
+                    ERROR("Invalid value for sw_field\n");
+                    break;
+            }
+        } else {
+            // we decide based on w_bit
+            if (w_bit==0x1) {
+                //16bit data
+                is_8bit = false;
+                is_signed_extended = false;
+                inst_result->src_needs_word_decorator = true;
+            } else {
+                // 8bit sign extend
+                is_8bit = true;
+                is_signed_extended = true;
+                if (is_dst_16bit(inst_result)) {
+                    // destination is 16bit but source is 8bit
+                    // add decorator to source data
+                    inst_result->src_needs_byte_decorator = true;
+                }
+            }
+        }
+        // extract data
+        consumed = extract_data(ptr, is_8bit, is_signed_extended, &inst_result->src_data, consumed_bytes);
         consumed_bytes += consumed;
         ptr += consumed;
     }

@@ -101,6 +101,9 @@ int main (int argc, char *argv[]) {
         // print the instruction
         print_decoded_instruction(&instruction);
         LOG("; consumed [%zu]bytes | bytes_available [%zi]bytes\n", consumed, bytes_available);
+        if (bytes_available<0) {
+            ERROR("; ERROR: Decoder OVERRUN.\n; Decoder consumed past end of buffer\n");
+        }
 
     }
     

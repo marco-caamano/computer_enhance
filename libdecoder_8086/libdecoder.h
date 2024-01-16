@@ -13,7 +13,9 @@
     }
 
 #define ERROR(...) {                    \
+        fprintf(stderr, "; !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"); \
         fprintf(stderr, __VA_ARGS__);   \
+        fprintf(stderr, "; !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"); \
         exit(1);                        \
     }
 
@@ -120,7 +122,8 @@ struct decoded_instruction_s {
     enum register_e src_effective_reg2;         // Second Source Register when src_type is TYPE_EFFECTIVE_ADDRESS
     int16_t src_effective_displacement;         // Displacement when src_type is TYPE_EFFECTIVE_ADDRESS
     int16_t src_data;                           // Source Data for command
-    bool src_data_is_16bit;                     // Source Data is 16bit
+    bool src_needs_byte_decorator;              // Source Data needs to specify byte decorator
+    bool src_needs_word_decorator;              // Source Data needs to specify word decorator
 
     enum operand_type_e dst_type;               // Destination Type
     enum register_e dst_register;               // Destination Register when dst_type is TYPE_REGISTER
@@ -129,6 +132,8 @@ struct decoded_instruction_s {
     enum register_e dst_effective_reg1;         // First Destination Register when dst_type is TYPE_EFFECTIVE_ADDRESS
     enum register_e dst_effective_reg2;         // Second Destination Register when dst_type is TYPE_EFFECTIVE_ADDRESS
     int16_t dst_effective_displacement;         // Displacement when dst_type is TYPE_EFFECTIVE_ADDRESS
+    bool dst_needs_byte_decorator;              // Destination Data needs to specify byte decorator
+    bool dst_needs_word_decorator;              // Destination Data needs to specify word decorator
 
 
 };
