@@ -640,19 +640,29 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
         if (is_direct_access) {
             // special case R/M is 110
             // 16 bit displacement follows
-            // source is the direct address
-            inst_result->src_type = TYPE_DIRECT_ADDRESS;
-            consumed = extract_direct_address(ptr, &inst_result->src_direct_address, consumed_bytes);
-            consumed_bytes += consumed;
-            ptr += consumed;
-            if (has_sr) {
-                // destination specified in SR field
-                inst_result->dst_type = TYPE_SEGMENT_REGISTER;
-                inst_result->dst_seg_register = segment_register_map[sr_field];
+            if (cmd->op_has_data_bytes) {
+                // if the OP has data bytes then this is the source
+                // and the dst is derived from direct address
+                inst_result->src_type = TYPE_DATA;
+                inst_result->dst_type = TYPE_DIRECT_ADDRESS;
+                consumed = extract_direct_address(ptr, &inst_result->dst_direct_address, consumed_bytes);
+                consumed_bytes += consumed;
+                ptr += consumed;
             } else {
-                // destination specificed in REG field
-                inst_result->dst_type = TYPE_REGISTER;
-                inst_result->dst_register = register_map[reg_field][w_bit];
+                // source is the direct address
+                inst_result->src_type = TYPE_DIRECT_ADDRESS;
+                consumed = extract_direct_address(ptr, &inst_result->src_direct_address, consumed_bytes);
+                consumed_bytes += consumed;
+                ptr += consumed;
+                if (has_sr) {
+                    // destination specified in SR field
+                    inst_result->dst_type = TYPE_SEGMENT_REGISTER;
+                    inst_result->dst_seg_register = segment_register_map[sr_field];
+                } else {
+                    // destination specificed in REG field
+                    inst_result->dst_type = TYPE_REGISTER;
+                    inst_result->dst_register = register_map[reg_field][w_bit];
+                }
             }
         } else if (is_register_mode) {
             // Register Mode, No Displacement
