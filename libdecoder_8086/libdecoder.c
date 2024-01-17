@@ -14,7 +14,23 @@ const char *instruction_name[] = {
     "mov",
     "add",
     "sub",
-    "cmp"
+    "cmp",
+    "jo",
+    "jno",
+    "jb",
+    "jnb",
+    "je",
+    "jnz",
+    "jbe",
+    "ja",
+    "js",
+    "jns",
+    "jp",
+    "jnp",
+    "jl",
+    "jnl",
+    "jle",
+    "jg",
 };
 
 /*
@@ -132,6 +148,25 @@ char *type_str[] = {
     "Invalid",
 };
 
+enum instructions_e jmp_inst_map[] = {
+    JO_INST,    // jo
+    JNO_INST,   // jno
+    JB_INST,    // jb
+    JNB_INST,   // jnb
+    JE_INST,    // je
+    JNZ_INST,   // jnz
+    JBE_INST,   // jbe
+    JA_INST,    // ja
+    JS_INST,    // js
+    JNS_INST,   // jns
+    JP_INST,    // jp
+    JNP_INST,   // jnp
+    JL_INST,    // jl
+    JNL_INST,   // jnl
+    JLE_INST,   // jle
+    JG_INST,    // jg
+};
+
 bool verbose = false;
 
 /*
@@ -160,6 +195,7 @@ void reset_instruction(struct decoded_instruction_s *inst) {
     inst->dst_effective_displacement = 0;
     inst->dst_needs_byte_decorator = false;
     inst->dst_needs_word_decorator = false;
+    inst->inst_is_short_w_data = false;
 }
 
 void dump_instruction(struct decoded_instruction_s *inst) {
@@ -185,6 +221,7 @@ void dump_instruction(struct decoded_instruction_s *inst) {
     LOG("; dst_effective_displacement  0x%04x\n", inst->dst_effective_displacement);
     LOG("; dst_needs_byte_decorator    %s\n", inst->dst_needs_byte_decorator ? "True" : "False");
     LOG("; dst_needs_word_decorator    %s\n", inst->dst_needs_word_decorator ? "True" : "False");
+    LOG("; inst_is_short_w_data        %s\n", inst->inst_is_short_w_data ? "True" : "False");
 }
 
 
@@ -192,6 +229,14 @@ void print_decoded_instruction(struct decoded_instruction_s *inst) {
     char dump_buffer[3*DUMP_STR_BUFFER_SIZE] = {0};
     char dst_buffer[STR_BUFFER_SIZE] = {0};
     char src_buffer[STR_BUFFER_SIZE] = {0};
+
+    if (inst->inst_is_short_w_data) {
+        // special case if the instruction is a short op with data then just print that out
+        snprintf((char *)&dump_buffer, DUMP_STR_BUFFER_SIZE, "%s %d", 
+                instruction_name[inst->op], inst->src_data);
+        printf("%s\n", dump_buffer);
+        return;
+    }
 
     switch (inst->dst_type) {
         case TYPE_REGISTER:
@@ -503,6 +548,7 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
     uint8_t mod_field = 0;
     uint8_t rm_field = 0;
     uint8_t sr_field = 0;
+    uint8_t first_byte = *ptr;
     bool has_d_bit = false;
     bool has_s_bit = false;
     bool has_w_bit = false;
@@ -880,6 +926,23 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
         consumed = extract_data(ptr, is_8bit, is_signed_extended, &inst_result->src_data, consumed_bytes);
         consumed_bytes += consumed;
         ptr += consumed;
+    }
+
+    if (cmd->is_jmp_instruction) {
+        inst_result->inst_is_short_w_data = true;
+        // JUMPs encode the offset in the next byte
+        // extract data
+        bool is_8bit = true;
+        bool is_signed_extended = false;
+        consumed = extract_data(ptr, is_8bit, is_signed_extended, &inst_result->src_data, consumed_bytes);
+        consumed_bytes += consumed;
+        ptr += consumed;
+
+        uint8_t jmp_field = first_byte & 0xF;
+        inst_result->op = jmp_inst_map[jmp_field];
+        LOG("; JMP instruction jmp_field[0x%x] decoded to [%s] offset[%d] ", jmp_field, instruction_name[inst_result->op], inst_result->src_data);
+
+        // jmp_inst_map
     }
 
     dump_instruction(inst_result);

@@ -92,6 +92,22 @@ enum instructions_e {
     ADD_INST,   // add op
     SUB_INST,   // sub op
     CMP_INST,   // cmp
+    JO_INST,    // jo
+    JNO_INST,   // jno
+    JB_INST,    // jb
+    JNB_INST,   // jnb
+    JE_INST,    // je
+    JNZ_INST,   // jnz
+    JBE_INST,   // jbe
+    JA_INST,    // ja
+    JS_INST,    // js
+    JNS_INST,   // jns
+    JP_INST,    // jp
+    JNP_INST,   // jnp
+    JL_INST,    // jl
+    JNL_INST,   // jnl
+    JLE_INST,   // jle
+    JG_INST,    // jg
     MAX_INST
 };
 
@@ -134,6 +150,8 @@ struct decoded_instruction_s {
     int16_t dst_effective_displacement;         // Displacement when dst_type is TYPE_EFFECTIVE_ADDRESS
     bool dst_needs_byte_decorator;              // Destination Data needs to specify byte decorator
     bool dst_needs_word_decorator;              // Destination Data needs to specify word decorator
+
+    bool inst_is_short_w_data;                  // Decoded Instruction is a short instruction with data <inst_nemonic> <data>
 
 
 };
