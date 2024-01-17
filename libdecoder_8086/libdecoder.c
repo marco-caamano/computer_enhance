@@ -31,6 +31,10 @@ const char *instruction_name[] = {
     "jnl",
     "jle",
     "jg",
+    "loopnz",
+    "loopz",
+    "loop",
+    "jcxz",
 };
 
 /*
@@ -165,6 +169,13 @@ enum instructions_e jmp_inst_map[] = {
     JNL_INST,   // jnl
     JLE_INST,   // jle
     JG_INST,    // jg
+};
+
+enum instructions_e loop_inst_map[] = {
+    LOOPNZ_INST,    // loopnz
+    LOOPZ_INST,     // loopz
+    LOOP_INST,      // loop
+    JCXZ_INST,      // jcxz
 };
 
 bool verbose = false;
@@ -928,9 +939,9 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
         ptr += consumed;
     }
 
-    if (cmd->is_jmp_instruction) {
+    if (cmd->is_short_instruction) {
         inst_result->inst_is_short_w_data = true;
-        // JUMPs encode the offset in the next byte
+        // Short instruction encode the offset in the next byte
         // extract data
         bool is_8bit = true;
         bool is_signed_extended = false;
@@ -938,11 +949,17 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
         consumed_bytes += consumed;
         ptr += consumed;
 
-        uint8_t jmp_field = first_byte & 0xF;
-        inst_result->op = jmp_inst_map[jmp_field];
-        LOG("; JMP instruction jmp_field[0x%x] decoded to [%s] offset[%d] ", jmp_field, instruction_name[inst_result->op], inst_result->src_data);
+        if ((first_byte & JMP_INST_MASK)==JMP_INST_ID) {
+            uint8_t jmp_field = first_byte & 0xF;
+            inst_result->op = jmp_inst_map[jmp_field];
+            LOG("; JMP instruction jmp_field[0x%x] decoded to [%s] offset[%d] ", jmp_field, instruction_name[inst_result->op], inst_result->src_data);
+        } else if ((first_byte & LOOP_INST_MASK)==LOOP_INST_ID) {
+            uint8_t loop_field = first_byte & 0x3;
+            inst_result->op = loop_inst_map[loop_field];
+            LOG("; JMP instruction loop_field[0x%x] decoded to [%s] offset[%d] ", loop_field, instruction_name[inst_result->op], inst_result->src_data);
+        }
 
-        // jmp_inst_map
+
     }
 
     dump_instruction(inst_result);

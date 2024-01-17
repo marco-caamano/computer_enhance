@@ -46,6 +46,11 @@
 #define SR_FIELD_MASK   0x3
 #define SR_FIELD_SHIFT  3
 
+#define JMP_INST_ID     0x70
+#define JMP_INST_MASK   0xF0
+#define LOOP_INST_ID    0xE0
+#define LOOP_INST_MASK  0xFC
+
 /*
  * 8086 General Purpose Registers
  */
@@ -88,26 +93,30 @@ enum segment_register_e {
  * 8086 Instructions
  */
 enum instructions_e {
-    MOV_INST,   // mov op
-    ADD_INST,   // add op
-    SUB_INST,   // sub op
-    CMP_INST,   // cmp
-    JO_INST,    // jo
-    JNO_INST,   // jno
-    JB_INST,    // jb
-    JNB_INST,   // jnb
-    JE_INST,    // je
-    JNZ_INST,   // jnz
-    JBE_INST,   // jbe
-    JA_INST,    // ja
-    JS_INST,    // js
-    JNS_INST,   // jns
-    JP_INST,    // jp
-    JNP_INST,   // jnp
-    JL_INST,    // jl
-    JNL_INST,   // jnl
-    JLE_INST,   // jle
-    JG_INST,    // jg
+    MOV_INST,       // mov op
+    ADD_INST,       // add op
+    SUB_INST,       // sub op
+    CMP_INST,       // cmp
+    JO_INST,        // jo
+    JNO_INST,       // jno
+    JB_INST,        // jb
+    JNB_INST,       // jnb
+    JE_INST,        // je
+    JNZ_INST,       // jnz
+    JBE_INST,       // jbe
+    JA_INST,        // ja
+    JS_INST,        // js
+    JNS_INST,       // jns
+    JP_INST,        // jp
+    JNP_INST,       // jnp
+    JL_INST,        // jl
+    JNL_INST,       // jnl
+    JLE_INST,       // jle
+    JG_INST,        // jg
+    LOOPNZ_INST,    // loopnz
+    LOOPZ_INST,     // loopz
+    LOOP_INST,      // loop
+    JCXZ_INST,      // jcxz
     MAX_INST
 };
 

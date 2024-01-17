@@ -39,7 +39,7 @@ struct opcode_bitstream_s {
     const bool op_has_hardcoded_src;        // Operation has a hardcoded source register
     const enum register_e hard_src_reg;     // Hardcoded Source Register
 
-    const bool is_jmp_instruction;          // Instruction is a JUMP
+    const bool is_short_instruction;        // Instruction is a JUMP
 
 };
 
@@ -69,7 +69,7 @@ struct opcode_bitstream_s mov1_op = {
     .hard_dst_reg = MAX_REG,
     .op_has_hardcoded_src = false,
     .hard_src_reg = MAX_REG,
-    .is_jmp_instruction = false,
+    .is_short_instruction = false,
 };
 
 // 1100011W immediate to register/memory
@@ -98,7 +98,7 @@ struct opcode_bitstream_s mov2_op = {
     .hard_dst_reg = MAX_REG,
     .op_has_hardcoded_src = false,
     .hard_src_reg = MAX_REG,
-    .is_jmp_instruction = false,
+    .is_short_instruction = false,
 };
 
 // 1011WREG immediate to register
@@ -127,7 +127,7 @@ struct opcode_bitstream_s mov3_op = {
     .hard_dst_reg = MAX_REG,
     .op_has_hardcoded_src = false,
     .hard_src_reg = MAX_REG,
-    .is_jmp_instruction = false,
+    .is_short_instruction = false,
 };
 
 // 1010000W Memory to Accumulator
@@ -156,7 +156,7 @@ struct opcode_bitstream_s mov4_op = {
     .hard_dst_reg = REG_AX,
     .op_has_hardcoded_src = false,
     .hard_src_reg = MAX_REG,
-    .is_jmp_instruction = false,
+    .is_short_instruction = false,
 };
 
 // 1010000W Memory to Accumulator
@@ -185,7 +185,7 @@ struct opcode_bitstream_s mov5_op = {
     .hard_dst_reg = MAX_REG,
     .op_has_hardcoded_src = true,
     .hard_src_reg = REG_AX,
-    .is_jmp_instruction = false,
+    .is_short_instruction = false,
 };
 
 // 000000DW Add Reg/Memory with register to either
@@ -214,7 +214,7 @@ struct opcode_bitstream_s add1_op = {
     .hard_dst_reg = MAX_REG,
     .op_has_hardcoded_src = false,
     .hard_src_reg = MAX_REG,
-    .is_jmp_instruction = false,
+    .is_short_instruction = false,
 };
 
 // 100000SW Immediate to Register/Memory ADD/SUB/CMP
@@ -243,7 +243,7 @@ struct opcode_bitstream_s multi1_op = {
     .hard_dst_reg = MAX_REG,
     .op_has_hardcoded_src = false,
     .hard_src_reg = MAX_REG,
-    .is_jmp_instruction = false,
+    .is_short_instruction = false,
 };
 
 //  0000010W Immediate to Accumulator ADD
@@ -272,7 +272,7 @@ struct opcode_bitstream_s add2_op = {
     .hard_dst_reg = REG_AX,
     .op_has_hardcoded_src = false,
     .hard_src_reg = MAX_REG,
-    .is_jmp_instruction = false,
+    .is_short_instruction = false,
 };
 
 // 001010DW SUB Reg/Memory with register to either
@@ -301,7 +301,7 @@ struct opcode_bitstream_s sub1_op = {
     .hard_dst_reg = MAX_REG,
     .op_has_hardcoded_src = false,
     .hard_src_reg = MAX_REG,
-    .is_jmp_instruction = false,
+    .is_short_instruction = false,
 };
 
 // 0010110W Immediate to Accumulator SUB
@@ -330,7 +330,7 @@ struct opcode_bitstream_s sub2_op = {
     .hard_dst_reg = REG_AX,
     .op_has_hardcoded_src = false,
     .hard_src_reg = MAX_REG,
-    .is_jmp_instruction = false,
+    .is_short_instruction = false,
 };
 
 // 001110DW SUB Reg/Memory with register to either
@@ -359,7 +359,7 @@ struct opcode_bitstream_s cmp1_op = {
     .hard_dst_reg = MAX_REG,
     .op_has_hardcoded_src = false,
     .hard_src_reg = MAX_REG,
-    .is_jmp_instruction = false,
+    .is_short_instruction = false,
 };
 
 // 0011110W Immediate with Accumulator CMP
@@ -388,7 +388,7 @@ struct opcode_bitstream_s cmp2_op = {
     .hard_dst_reg = REG_AX,
     .op_has_hardcoded_src = false,
     .hard_src_reg = MAX_REG,
-    .is_jmp_instruction = false,
+    .is_short_instruction = false,
 };
 
 struct opcode_bitstream_s jump_op = {
@@ -416,7 +416,35 @@ struct opcode_bitstream_s jump_op = {
     .hard_dst_reg = MAX_REG,
     .op_has_hardcoded_src = false,
     .hard_src_reg = MAX_REG,
-    .is_jmp_instruction = true,
+    .is_short_instruction = true,
+};
+
+struct opcode_bitstream_s loop_op = {
+    .op = MAX_INST,
+    .name = "MultiInstruction LOOP",
+    .opcode = 0xE0,
+    .opcode_bitmask = 0xFC,
+    .op_has_register_byte = false,
+    .op_has_opt_disp_bytes = false,
+    .op_has_data_bytes = false,
+    .op_has_address_bytes = false,
+    .byte1_has_d_flag = false,
+    .byte1_has_s_flag = false,
+    .byte1_has_w_flag = false,
+    .w_flag_shift = 0,
+    .byte1_has_reg_field = false,
+    .byte2_has_reg_field = false,
+    .reg_field_shift = 3,
+    .byte2_has_mod_field = false,
+    .byte2_has_rm_field = false,
+    .byte2_has_sr_field = false,
+    .byte2_has_op_encode_field = false,
+    .sr_is_target = false,
+    .op_has_hardcoded_dst = false,
+    .hard_dst_reg = MAX_REG,
+    .op_has_hardcoded_src = false,
+    .hard_src_reg = MAX_REG,
+    .is_short_instruction = true,
 };
 
 struct opcode_bitstream_s *op_cmds[] = {
@@ -433,4 +461,5 @@ struct opcode_bitstream_s *op_cmds[] = {
     &cmp1_op,
     &cmp2_op,
     &jump_op,
+    &loop_op,
 };
