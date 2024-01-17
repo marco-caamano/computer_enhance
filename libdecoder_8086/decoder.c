@@ -98,6 +98,9 @@ int main (int argc, char *argv[]) {
         bytes_available -= consumed;
         ptr += consumed;
 
+        // dump instruction internals
+        dump_instruction(&instruction, verbose);
+
         // print the instruction
         print_decoded_instruction(&instruction);
         LOG("; consumed [%zu]bytes | bytes_available [%zi]bytes\n", consumed, bytes_available);

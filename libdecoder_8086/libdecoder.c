@@ -10,7 +10,7 @@
 #define DUMP_STR_BUFFER_SIZE    3*STR_BUFFER_SIZE
 
 // This must match against instructions_e enum
-const char *instruction_name[] = {
+static const char *instruction_name[] = {
     "mov",
     "add",
     "sub",
@@ -53,7 +53,7 @@ const char *instruction_name[] = {
  * 
  * Mapping Just ADD, SUB and CMP
  */
-const enum instructions_e op_encoding[] = {
+static const enum instructions_e op_encoding[] = {
     ADD_INST,   // ADD
     MAX_INST,   // Unknown
     MAX_INST,   // ADC
@@ -64,7 +64,7 @@ const enum instructions_e op_encoding[] = {
     CMP_INST,   // CMP
 };
 
-const char *register_name[] = {
+static const char *register_name[] = {
     "ax",
     "al",
     "ah",
@@ -84,7 +84,7 @@ const char *register_name[] = {
     "INVALID"
 };
 
-const enum register_e register_map[8][2] = {
+static const enum register_e register_map[8][2] = {
     { REG_AL, REG_AX }, 
     { REG_CL, REG_CX }, 
     { REG_DL, REG_DX }, 
@@ -95,7 +95,7 @@ const enum register_e register_map[8][2] = {
     { REG_BH, REG_DI }
 };
 
-const char *segment_register_name[] = {
+static const char *segment_register_name[] = {
     "es",
     "cs",
     "ss",
@@ -103,7 +103,7 @@ const char *segment_register_name[] = {
     "INVALID"
 };
 
-const enum segment_register_e segment_register_map[] = {
+static const enum segment_register_e segment_register_map[] = {
     SEG_REG_ES,
     SEG_REG_CS,
     SEG_REG_SS,
@@ -122,7 +122,7 @@ const enum segment_register_e segment_register_map[] = {
  * { REG_DI, MAX_REG } ==>   di
  * 
  */
-const enum register_e mod_effective_address_map[8][2] = {
+static const enum register_e mod_effective_address_map[8][2] = {
     { REG_BX, REG_SI },
     { REG_BX, REG_DI },
     { REG_BP, REG_SI },
@@ -133,7 +133,7 @@ const enum register_e mod_effective_address_map[8][2] = {
     { REG_BX, MAX_REG }
 };
 
-char *byte_count_str[] = {
+static char *byte_count_str[] = {
     "",
     "1st",
     "2nd",
@@ -143,7 +143,7 @@ char *byte_count_str[] = {
     "6th"
 };
 
-char *type_str[] = {
+static char *type_str[] = {
     "Register",
     "Segment Register",
     "Direct Address",
@@ -152,7 +152,7 @@ char *type_str[] = {
     "Invalid",
 };
 
-enum instructions_e jmp_inst_map[] = {
+static enum instructions_e jmp_inst_map[] = {
     JO_INST,    // jo
     JNO_INST,   // jno
     JB_INST,    // jb
@@ -171,14 +171,29 @@ enum instructions_e jmp_inst_map[] = {
     JG_INST,    // jg
 };
 
-enum instructions_e loop_inst_map[] = {
+static enum instructions_e loop_inst_map[] = {
     LOOPNZ_INST,    // loopnz
     LOOPZ_INST,     // loopz
     LOOP_INST,      // loop
     JCXZ_INST,      // jcxz
 };
 
-bool verbose = false;
+
+const char *get_register_name(enum register_e reg) {
+    if (reg>MAX_REG) {
+        return "INVALID";
+    }
+    return register_name[reg];
+}
+
+
+const char *get_segment_register_name(enum segment_register_e seg_reg) {
+    if (seg_reg>MAX_SEG_REG) {
+        return "INVALID";
+    }
+    return segment_register_name[seg_reg];
+}
+
 
 /*
  * Reset the Instruction to initial values
@@ -209,7 +224,7 @@ void reset_instruction(struct decoded_instruction_s *inst) {
     inst->inst_is_short_w_data = false;
 }
 
-void dump_instruction(struct decoded_instruction_s *inst) {
+void dump_instruction(struct decoded_instruction_s *inst, bool verbose) {
     LOG("; Dump Instruction:\n");
     LOG("; op                          %s\n", instruction_name[inst->op]);
     LOG("; name                        %s\n", inst->name);
@@ -427,7 +442,7 @@ bool is_dst_16bit(struct decoded_instruction_s *inst) {
  * can skip ahead to process the next unprocessed bytes
  * in the buffer
  */
-size_t extract_displacement(uint8_t *ptr, uint8_t bit_w, int16_t *displacement, size_t prev_consumed_bytes) {
+size_t extract_displacement(uint8_t *ptr, uint8_t bit_w, int16_t *displacement, size_t prev_consumed_bytes, bool verbose) {
     int consumed_bytes = 0;
     uint8_t displacement_low = 0;
     uint8_t displacement_high = 0;
@@ -471,7 +486,7 @@ size_t extract_displacement(uint8_t *ptr, uint8_t bit_w, int16_t *displacement, 
  * can skip ahead to process the next unprocessed bytes
  * in the buffer
  */
-size_t extract_direct_address(uint8_t *ptr, uint16_t *direct_address, size_t prev_consumed_bytes) {
+size_t extract_direct_address(uint8_t *ptr, uint16_t *direct_address, size_t prev_consumed_bytes, bool verbose) {
     int consumed_bytes = 0;
     uint8_t direct_address_low = 0;
     uint8_t direct_address_high = 0;
@@ -504,7 +519,7 @@ size_t extract_direct_address(uint8_t *ptr, uint16_t *direct_address, size_t pre
  * can skip ahead to process the next unprocessed bytes
  * in the buffer
  */
-int extract_data(uint8_t *ptr, bool is_8bit, bool is_signed_extended, int16_t *data, int prev_consumed_bytes) {
+int extract_data(uint8_t *ptr, bool is_8bit, bool is_signed_extended, int16_t *data, int prev_consumed_bytes, bool verbose) {
     int consumed_bytes = 0;
     uint8_t data_low = 0;
     uint8_t data_high = 0;
@@ -548,7 +563,7 @@ int extract_data(uint8_t *ptr, bool is_8bit, bool is_signed_extended, int16_t *d
     return consumed_bytes;
 }
 
-size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_verbose, struct decoded_instruction_s *inst_result) {
+size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool verbose, struct decoded_instruction_s *inst_result) {
     size_t consumed_bytes = 1;
     size_t consumed = 0;
     uint8_t d_bit = 0;
@@ -571,8 +586,6 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
     int16_t displacement = 0;
 
     reset_instruction(inst_result);
-
-    verbose = is_verbose;
 
     if (cmd->byte2_has_op_encode_field) {
         // multi-instruction it is mapped on op_code in 2nd Byte
@@ -708,13 +721,13 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
                 // and the dst is derived from direct address
                 inst_result->src_type = TYPE_DATA;
                 inst_result->dst_type = TYPE_DIRECT_ADDRESS;
-                consumed = extract_direct_address(ptr, &inst_result->dst_direct_address, consumed_bytes);
+                consumed = extract_direct_address(ptr, &inst_result->dst_direct_address, consumed_bytes, verbose);
                 consumed_bytes += consumed;
                 ptr += consumed;
             } else {
                 // source is the direct address
                 inst_result->src_type = TYPE_DIRECT_ADDRESS;
-                consumed = extract_direct_address(ptr, &inst_result->src_direct_address, consumed_bytes);
+                consumed = extract_direct_address(ptr, &inst_result->src_direct_address, consumed_bytes, verbose);
                 consumed_bytes += consumed;
                 ptr += consumed;
                 if (has_sr) {
@@ -776,7 +789,7 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
             // Memory Mode
             displacement = 0;
             if (has_displacement) {
-                consumed = extract_displacement(ptr, displacemen_is_16bit, &displacement, consumed_bytes);
+                consumed = extract_displacement(ptr, displacemen_is_16bit, &displacement, consumed_bytes, verbose);
                 consumed_bytes += consumed;
                 ptr += consumed;
             }
@@ -852,7 +865,7 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
         if (cmd->op_has_address_bytes) {
             // source is the direct address
             inst_result->src_type = TYPE_DIRECT_ADDRESS;
-            consumed = extract_direct_address(ptr, &inst_result->src_direct_address, consumed_bytes);
+            consumed = extract_direct_address(ptr, &inst_result->src_direct_address, consumed_bytes, verbose);
             consumed_bytes += consumed;
             ptr += consumed;
         } else if (cmd->op_has_data_bytes) {
@@ -867,7 +880,7 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
         inst_result->src_register = cmd->hard_src_reg;
         // source is the direct address
         inst_result->dst_type = TYPE_DIRECT_ADDRESS;
-        consumed = extract_direct_address(ptr, &inst_result->dst_direct_address, consumed_bytes);
+        consumed = extract_direct_address(ptr, &inst_result->dst_direct_address, consumed_bytes,verbose);
         consumed_bytes += consumed;
         ptr += consumed;
     }
@@ -940,7 +953,7 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
             }
         }
         // extract data
-        consumed = extract_data(ptr, is_8bit, is_signed_extended, &inst_result->src_data, consumed_bytes);
+        consumed = extract_data(ptr, is_8bit, is_signed_extended, &inst_result->src_data, consumed_bytes, verbose);
         consumed_bytes += consumed;
         ptr += consumed;
     }
@@ -951,7 +964,7 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
         // extract data
         bool is_8bit = true;
         bool is_signed_extended = false;
-        consumed = extract_data(ptr, is_8bit, is_signed_extended, &inst_result->src_data, consumed_bytes);
+        consumed = extract_data(ptr, is_8bit, is_signed_extended, &inst_result->src_data, consumed_bytes, verbose);
         consumed_bytes += consumed;
         ptr += consumed;
 
@@ -967,8 +980,6 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
 
 
     }
-
-    dump_instruction(inst_result);
 
     return consumed_bytes;
 }

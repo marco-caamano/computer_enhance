@@ -170,3 +170,9 @@ struct decoded_instruction_s {
 size_t decode_bitstream(uint8_t *ptr, size_t bytes_available, bool is_verbose, struct decoded_instruction_s *inst_result);
 
 void print_decoded_instruction(struct decoded_instruction_s *inst);
+
+void dump_instruction(struct decoded_instruction_s *inst, bool verbose);
+
+const char *get_register_name(enum register_e reg);
+
+const char *get_segment_register_name(enum segment_register_e seg_reg);
