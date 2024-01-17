@@ -4,4 +4,7 @@
 
 bits 16
 
-cmp word [4834], 29
+mov sp, ss
+mov bp, ds
+mov si, es
+mov di, dx

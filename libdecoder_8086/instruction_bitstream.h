@@ -188,6 +188,64 @@ struct opcode_bitstream_s mov5_op = {
     .is_short_instruction = false,
 };
 
+// 10001110 register/memory to segment register
+struct opcode_bitstream_s mov6_op = {
+    .op = MOV_INST,
+    .name = "Register/Memory to Segment Register MOV",
+    .opcode = 0x8E,
+    .opcode_bitmask = 0xFF,
+    .op_has_register_byte = true,
+    .op_has_opt_disp_bytes = true,
+    .op_has_data_bytes = false,
+    .op_has_address_bytes = false,
+    .byte1_has_d_flag = false,
+    .byte1_has_s_flag = false,
+    .byte1_has_w_flag = false,
+    .w_flag_shift = 0,
+    .byte1_has_reg_field = false,
+    .byte2_has_reg_field = false,
+    .reg_field_shift = 3,
+    .byte2_has_mod_field = true,
+    .byte2_has_rm_field = true,
+    .byte2_has_sr_field = true,
+    .byte2_has_op_encode_field = false,
+    .sr_is_target = true,
+    .op_has_hardcoded_dst = false,
+    .hard_dst_reg = MAX_REG,
+    .op_has_hardcoded_src = false,
+    .hard_src_reg = MAX_REG,
+    .is_short_instruction = false,
+};
+
+// 10001100 register/memory to segment register
+struct opcode_bitstream_s mov7_op = {
+    .op = MOV_INST,
+    .name = "Segment Register to Register/Memory MOV",
+    .opcode = 0x8C,
+    .opcode_bitmask = 0xFF,
+    .op_has_register_byte = true,
+    .op_has_opt_disp_bytes = true,
+    .op_has_data_bytes = false,
+    .op_has_address_bytes = false,
+    .byte1_has_d_flag = false,
+    .byte1_has_s_flag = false,
+    .byte1_has_w_flag = false,
+    .w_flag_shift = 0,
+    .byte1_has_reg_field = false,
+    .byte2_has_reg_field = false,
+    .reg_field_shift = 3,
+    .byte2_has_mod_field = true,
+    .byte2_has_rm_field = true,
+    .byte2_has_sr_field = true,
+    .byte2_has_op_encode_field = false,
+    .sr_is_target = false,
+    .op_has_hardcoded_dst = false,
+    .hard_dst_reg = MAX_REG,
+    .op_has_hardcoded_src = false,
+    .hard_src_reg = MAX_REG,
+    .is_short_instruction = false,
+};
+
 // 000000DW Add Reg/Memory with register to either
 struct opcode_bitstream_s add1_op = {
     .op = ADD_INST,
@@ -453,6 +511,8 @@ struct opcode_bitstream_s *op_cmds[] = {
     &mov3_op,
     &mov4_op,
     &mov5_op,
+    &mov6_op,
+    &mov7_op,
     &add1_op,
     &multi1_op,
     &add2_op,

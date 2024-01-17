@@ -655,6 +655,12 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool is_
     bool has_displacement = false;
     bool displacemen_is_16bit = false;
 
+    if (has_sr) {
+        // when we are targetting segment registers op is 16bit
+        // since w_bit is not present in segment ops force it
+        w_bit = 0x1;
+    }
+
     if (has_mod) {
         // sanity check rm_field should always acompany mod field
         if (!has_rm) {
