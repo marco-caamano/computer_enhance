@@ -17,10 +17,6 @@
 #define MEMORY_SIZE 1024*1024
 
 
-#define OUTPUT(...) {               \
-    printf(__VA_ARGS__);            \
-}
-
 #define DUMP_SEGMENT_REGS() {               \
     if (verbose && trace) {                 \
         for (int i=0; i<4; i++) {           \
@@ -86,6 +82,59 @@ struct reg_definition_s reg_item_map[MAX_REG] = {
     REG_DEF_DI,
 };
 
+/*
+ * FLAGS
+ * ZF   Zero Flag
+ * PF   Parity Flag
+ * SF   Signed Flag
+ * OF   Overflow Flag
+ * CF   Carry Flag
+ * AF   Auxiliary Carry Flag
+ */
+#define ZERO_FLAG_MASK          0x40
+#define ZERO_FLAG_SHIFT         6
+#define SIGNED_FLAG_MASK        0x80
+#define SIGNED_FLAG_SHIFT       7
+#define ZERO_AND_SIGNED_MASK    0xC0
+
+#define REGISTER_SIGNED_MASK    0x8000
+
+uint16_t flags = 0;
+
+void eval_flags(uint16_t value) {
+    if (value==0) {
+        // set zero flag
+        flags |= (1<<ZERO_FLAG_SHIFT);
+    } else {
+        // clear zero flag
+        flags &= ~ZERO_FLAG_MASK;
+    }
+    if ((value & REGISTER_SIGNED_MASK) != 0) {
+        // set signed flag
+        flags |= (1<<SIGNED_FLAG_SHIFT);
+    } else {
+        // clear signed flag
+        flags &= ~SIGNED_FLAG_MASK;
+    }
+}
+
+char *get_flags(uint16_t value) {
+    // for now just shift down flags and eval 2bits
+    uint8_t flags = (value & ZERO_AND_SIGNED_MASK) >> ZERO_FLAG_SHIFT;
+    switch (flags) {
+        case 0x0:
+            return "";
+        case 0x1:
+            return "Z";
+        case 0x2:
+            return "S";
+        case 0x3:
+            return "SZ";
+        default:
+            ERROR("Invalid Flag\n");
+            break;
+    }
+}
 
 uint16_t read_register(struct reg_definition_s item) {
     uint16_t mask = item.mask;
@@ -101,6 +150,122 @@ uint16_t write_register(struct reg_definition_s dst_item, uint16_t value) {
     data |= (value<<shift) & mask;
     registers[dst_item.reg] = data;
     return registers[dst_item.reg];
+}
+
+bool parse_sub_cmp_inst(struct decoded_instruction_s *inst, bool is_sub) {
+    bool failed = false;
+    uint16_t dst_val;
+    uint16_t src_val;
+    uint16_t value;
+    uint16_t prev_flags;
+
+    switch (inst->dst_type) {
+        case TYPE_REGISTER:
+            struct reg_definition_s dst_reg = reg_item_map[inst->dst_register];
+            switch (inst->src_type) {
+                case TYPE_REGISTER:
+                    struct reg_definition_s src_reg = reg_item_map[inst->src_register];
+                    dst_val = read_register(dst_reg);
+                    src_val = read_register(src_reg);
+                    value = dst_val - src_val;
+                    prev_flags = flags;
+                    eval_flags(value);
+                    if (is_sub) {
+                        write_register(dst_reg, value);
+                        printf("%s %s, %s \t; %s:0x%04x -> 0x%04x \t Flags:[%s]->[%s]\n", 
+                            inst->op_name, 
+                            get_register_name(inst->dst_register), 
+                            get_register_name(inst->src_register), 
+                            get_register_name(inst->dst_register), 
+                            dst_val,
+                            value,
+                            get_flags(prev_flags),
+                            get_flags(flags));
+                    } else {
+                        printf("%s %s, %s \t; \t\t\t Flags:[%s]->[%s]\n", 
+                            inst->op_name, 
+                            get_register_name(inst->dst_register), 
+                            get_register_name(inst->src_register), 
+                            get_flags(prev_flags),
+                            get_flags(flags));
+                    }
+                    break;
+                case TYPE_DATA:
+                    dst_val = read_register(dst_reg);
+                    src_val = inst->src_data;
+                    value = dst_val - src_val;
+                    prev_flags = flags;
+                    eval_flags(value);
+                    if (is_sub) {
+                        write_register(dst_reg, value);
+                        printf("%s %s, %d \t; %s:0x%04x -> 0x%04x \t Flags:[%s]->[%s]\n", 
+                            inst->op_name, 
+                            get_register_name(inst->dst_register), 
+                            src_val,
+                            get_register_name(inst->dst_register), 
+                            dst_val,
+                            value,
+                            get_flags(prev_flags),
+                            get_flags(flags));
+                    } else {
+                        printf("%s %s, %d \t; \t\t\t Flags:[%s]->[%s]\n", 
+                            inst->op_name, 
+                            get_register_name(inst->dst_register), 
+                            src_val, 
+                            get_flags(prev_flags),
+                            get_flags(flags));
+                    }
+                    break;
+                default:
+                    ERROR("Unhandled src_type[%d]\n", inst->src_type);
+                    break;
+            }
+            break;
+        default:
+            ERROR("Unhandled dst_type[%d]\n", inst->dst_type);
+            break;
+    }
+    return failed;
+}
+
+bool parse_add_inst(struct decoded_instruction_s *inst) {
+    bool failed = false;
+    uint16_t dst_val;
+    uint16_t src_val;
+    uint16_t value;
+    uint16_t prev_flags;
+
+    switch (inst->dst_type) {
+        case TYPE_REGISTER:
+            struct reg_definition_s dst_reg = reg_item_map[inst->dst_register];
+            switch (inst->src_type) {
+                case TYPE_DATA:
+                    dst_val = read_register(dst_reg);
+                    src_val = inst->src_data;
+                    value = dst_val + src_val;
+                    prev_flags = flags;
+                    eval_flags(value);
+                    write_register(dst_reg, value);
+                    printf("%s %s, %d \t; %s:0x%04x -> 0x%04x \t Flags:[%s]->[%s]\n", 
+                        inst->op_name, 
+                        get_register_name(inst->dst_register), 
+                        src_val,
+                        get_register_name(inst->dst_register), 
+                        dst_val,
+                        value,
+                        get_flags(prev_flags),
+                        get_flags(flags));
+                    break;
+                default:
+                    ERROR("Unhandled src_type[%d]\n", inst->src_type);
+                    break;
+            }
+            break;
+        default:
+            ERROR("Unhandled dst_type[%d]\n", inst->dst_type);
+            break;
+    }
+    return failed;
 }
 
 bool parse_mov_inst(struct decoded_instruction_s *inst) {
@@ -173,6 +338,7 @@ bool parse_mov_inst(struct decoded_instruction_s *inst) {
     return failed;
 }
 
+
 void usage(void) {
     fprintf(stderr, "8086 Instruction Simulator Usage:\n");
     fprintf(stderr, "-h         This help dialog.\n");
@@ -187,6 +353,7 @@ int main (int argc, char *argv[]) {
     FILE *in_fp = NULL;
     size_t bytes_available;
     struct decoded_instruction_s instruction = {};
+    bool failed;
 
     while( (opt = getopt(argc, argv, "hi:vt")) != -1) {
         switch (opt) {
@@ -267,15 +434,35 @@ int main (int argc, char *argv[]) {
         switch (instruction.op) {
             case MOV_INST:
                 LOG("Found %s MOV Instruction, parsing...\n", instruction.name);
-                bool failed = parse_mov_inst(&instruction);
+                failed = parse_mov_inst(&instruction);
                 if (failed) {
                     ERROR("Failed to parse MOV instruction\n");
                 }
                 break;
+            case SUB_INST:
+                LOG("Found %s SUB Instruction, parsing...\n", instruction.name);
+                failed = parse_sub_cmp_inst(&instruction, true);
+                if (failed) {
+                    ERROR("Failed to parse SUB instruction\n");
+                }
+                break;
+            case CMP_INST:
+                LOG("Found %s CMP Instruction, parsing...\n", instruction.name);
+                failed = parse_sub_cmp_inst(&instruction, false);
+                if (failed) {
+                    ERROR("Failed to parse CMP instruction\n");
+                }
+                break;
+            case ADD_INST:
+                LOG("Found %s ADD Instruction, parsing...\n", instruction.name);
+                failed = parse_add_inst(&instruction);
+                if (failed) {
+                    ERROR("Failed to parse ADD instruction\n");
+                }
+                break;
             default:
-                ERROR("Unsupported instruction [%s]\n", instruction.name);
+                ERROR("Unsupported instruction [%s][%s]\n", instruction.name, instruction.op_name);
         }
-
     }
     
     LOG("\ndecode_bitstream consumed all %zu bytes from file\n", bytes_available);
@@ -297,6 +484,7 @@ int main (int argc, char *argv[]) {
     for (enum segment_register_e seg_reg=SEG_REG_ES; seg_reg<MAX_SEG_REG; seg_reg++) {
         printf("\t%s: 0x%04x (%d)\n", get_segment_register_name(seg_reg), segment_registers[seg_reg], segment_registers[seg_reg]);
     }
+    printf("\nFlags:[%s]\n", get_flags(flags));
 
     printf("\n\n");
 
