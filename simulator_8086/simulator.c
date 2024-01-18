@@ -160,7 +160,6 @@ bool parse_sub_cmp_inst(struct decoded_instruction_s *inst, bool is_sub) {
     uint16_t dst_val;
     uint16_t src_val;
     uint16_t value;
-    uint16_t prev_flags;
 
     switch (inst->dst_type) {
         case TYPE_REGISTER:
@@ -171,52 +170,42 @@ bool parse_sub_cmp_inst(struct decoded_instruction_s *inst, bool is_sub) {
                     dst_val = read_register(dst_reg);
                     src_val = read_register(src_reg);
                     value = dst_val - src_val;
-                    prev_flags = flags;
                     eval_flags(value);
                     if (is_sub) {
                         write_register(dst_reg, value);
-                        printf("%s %s, %s \t; %s:0x%04x -> 0x%04x \t Flags:[%s]->[%s]\n", 
+                        printf("%s %s, %s \t; %s:0x%04x -> 0x%04x ", 
                             inst->op_name, 
                             get_register_name(inst->dst_register), 
                             get_register_name(inst->src_register), 
                             get_register_name(inst->dst_register), 
                             dst_val,
-                            value,
-                            get_flags(prev_flags),
-                            get_flags(flags));
+                            value);
                     } else {
-                        printf("%s %s, %s \t; \t\t\t Flags:[%s]->[%s]\n", 
+                        printf("%s %s, %s \t;\t\t ", 
                             inst->op_name, 
                             get_register_name(inst->dst_register), 
-                            get_register_name(inst->src_register), 
-                            get_flags(prev_flags),
-                            get_flags(flags));
+                            get_register_name(inst->src_register));
                     }
                     break;
                 case TYPE_DATA:
                     dst_val = read_register(dst_reg);
                     src_val = inst->src_data;
                     value = dst_val - src_val;
-                    prev_flags = flags;
                     eval_flags(value);
                     if (is_sub) {
                         write_register(dst_reg, value);
-                        printf("%s %s, %d \t; %s:0x%04x -> 0x%04x \t Flags:[%s]->[%s]\n", 
+                        printf("%s %s, %d \t; %s:0x%04x -> 0x%04x ", 
                             inst->op_name, 
                             get_register_name(inst->dst_register), 
                             src_val,
                             get_register_name(inst->dst_register), 
                             dst_val,
-                            value,
-                            get_flags(prev_flags),
-                            get_flags(flags));
+                            value);
                     } else {
-                        printf("%s %s, %d \t; \t\t\t Flags:[%s]->[%s]\n", 
+                        printf("%s %s, %d \t; ", 
                             inst->op_name, 
                             get_register_name(inst->dst_register), 
-                            src_val, 
-                            get_flags(prev_flags),
-                            get_flags(flags));
+                            src_val);
                     }
                     break;
                 default:
@@ -236,7 +225,6 @@ bool parse_add_inst(struct decoded_instruction_s *inst) {
     uint16_t dst_val;
     uint16_t src_val;
     uint16_t value;
-    uint16_t prev_flags;
 
     switch (inst->dst_type) {
         case TYPE_REGISTER:
@@ -246,18 +234,15 @@ bool parse_add_inst(struct decoded_instruction_s *inst) {
                     dst_val = read_register(dst_reg);
                     src_val = inst->src_data;
                     value = dst_val + src_val;
-                    prev_flags = flags;
                     eval_flags(value);
                     write_register(dst_reg, value);
-                    printf("%s %s, %d \t; %s:0x%04x -> 0x%04x \t Flags:[%s]->[%s]\n", 
+                    printf("%s %s, %d \t; %s:0x%04x -> 0x%04x", 
                         inst->op_name, 
                         get_register_name(inst->dst_register), 
                         src_val,
                         get_register_name(inst->dst_register), 
                         dst_val,
-                        value,
-                        get_flags(prev_flags),
-                        get_flags(flags));
+                        value);
                     break;
                 default:
                     ERROR("Unhandled src_type[%d]\n", inst->src_type);
@@ -285,7 +270,7 @@ bool parse_mov_inst(struct decoded_instruction_s *inst) {
                     dst_val = read_register(dst_reg);
                     value = read_register(src_reg);
                     write_register(dst_reg, value);
-                    printf("%s %s, %s \t; %s:0x%04x -> 0x%04x\n", inst->op_name, 
+                    printf("%s %s, %s \t; %s:0x%04x -> 0x%04x", inst->op_name, 
                         get_register_name(inst->dst_register), 
                         get_register_name(inst->src_register), 
                         get_register_name(inst->dst_register), 
@@ -295,7 +280,7 @@ bool parse_mov_inst(struct decoded_instruction_s *inst) {
                     dst_val = read_register(dst_reg);
                     value = segment_registers[inst->src_seg_register];
                     write_register(dst_reg, value);
-                    printf("%s %s, %s \t; %s:0x%04x -> 0x%04x\n", inst->op_name, 
+                    printf("%s %s, %s \t; %s:0x%04x -> 0x%04x", inst->op_name, 
                         get_register_name(inst->dst_register), 
                         get_segment_register_name(inst->src_seg_register), 
                         get_register_name(inst->dst_register), 
@@ -304,7 +289,7 @@ bool parse_mov_inst(struct decoded_instruction_s *inst) {
                 case TYPE_DATA:
                     dst_val = read_register(dst_reg);
                     write_register(dst_reg, inst->src_data);
-                    printf("%s %s, %d \t; %s:0x%04x -> 0x%04x\n", inst->op_name, 
+                    printf("%s %s, %d \t; %s:0x%04x -> 0x%04x", inst->op_name, 
                         get_register_name(inst->dst_register), 
                         inst->src_data, 
                         get_register_name(inst->dst_register), 
@@ -416,6 +401,8 @@ int main (int argc, char *argv[]) {
 
     while (bytes_available > 0) {
         uint8_t *ptr = (uint8_t *)&instruction_bitstream + ip;
+        uint8_t prev_ip = ip;
+        uint16_t pref_flags = flags;
         size_t consumed = decode_bitstream((uint8_t *)&instruction_bitstream + ip, bytes_available, verbose, &instruction);
         if (consumed == 0) {
             ERROR("Failed to decode instruction at byte[%zu]->[0x%02x]\n", ptr-instruction_bitstream, *ptr);
@@ -464,6 +451,12 @@ int main (int argc, char *argv[]) {
                 break;
             default:
                 ERROR("Unsupported instruction [%s][%s]\n", instruction.name, instruction.op_name);
+        }
+        printf("\tip:0x%04x -> 0x%04x", prev_ip, ip);
+        if (pref_flags!=flags) {
+            printf("\tFlags:[%s]->[%s]\n", get_flags(pref_flags), get_flags(flags));
+        } else {
+            printf("\tFlags:[%s]\n", get_flags(flags));
         }
     }
     
