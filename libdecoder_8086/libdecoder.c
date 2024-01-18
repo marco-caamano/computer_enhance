@@ -202,6 +202,7 @@ const char *get_segment_register_name(enum segment_register_e seg_reg) {
 void reset_instruction(struct decoded_instruction_s *inst) {
     inst->op = MAX_INST;
     inst->name = "";
+    inst->op_name = "";
     inst->src_type = MAX_TYPE;
     inst->src_register = MAX_REG;
     inst->src_seg_register = MAX_SEG_REG;
@@ -227,7 +228,8 @@ void reset_instruction(struct decoded_instruction_s *inst) {
 void dump_instruction(struct decoded_instruction_s *inst, bool verbose) {
     LOG("; Dump Instruction:\n");
     LOG("; op                          %s\n", instruction_name[inst->op]);
-    LOG("; name                        %s\n", inst->name);
+    LOG("; op_name                     %s\n", inst->op_name);
+    LOG("; description                 %s\n", inst->name);
     LOG("; src_type                    %s\n", type_str[inst->src_type]);
     LOG("; src_register                %s\n", register_name[inst->src_register]);
     LOG("; src_seg_register            %s\n", segment_register_name[inst->src_seg_register]);
@@ -596,6 +598,7 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool ver
     }
 
     inst_result->op = cmd->op;
+    inst_result->op_name = instruction_name[cmd->op];
     inst_result->name = cmd->name;
 
     // extract any stuff from 1st byte
@@ -639,6 +642,7 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool ver
         if (cmd->byte2_has_op_encode_field) {
             op_encode_field = (*ptr >> OP_ENCODE_SHIFT) & OP_ENCODE_MASK;
             inst_result->op = op_encoding[op_encode_field];
+            inst_result->op_name = instruction_name[inst_result->op];
             LOG("OP_ENCODE[0x%x][%s] ", op_encode_field, instruction_name[inst_result->op]);
         }
         if (cmd->byte2_has_rm_field) {
@@ -971,10 +975,12 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool ver
         if ((first_byte & JMP_INST_MASK)==JMP_INST_ID) {
             uint8_t jmp_field = first_byte & 0xF;
             inst_result->op = jmp_inst_map[jmp_field];
+            inst_result->op_name = instruction_name[inst_result->op];
             LOG("; JMP instruction jmp_field[0x%x] decoded to [%s] offset[%d] ", jmp_field, instruction_name[inst_result->op], inst_result->src_data);
         } else if ((first_byte & LOOP_INST_MASK)==LOOP_INST_ID) {
             uint8_t loop_field = first_byte & 0x3;
             inst_result->op = loop_inst_map[loop_field];
+            inst_result->op_name = instruction_name[inst_result->op];
             LOG("; JMP instruction loop_field[0x%x] decoded to [%s] offset[%d] ", loop_field, instruction_name[inst_result->op], inst_result->src_data);
         }
 

@@ -137,6 +137,7 @@ enum operand_type_e {
  */
 struct decoded_instruction_s {
     enum instructions_e op;                     // Instruction encoded in opcode bitstream
+    const char *op_name;                        // Instruction mnemonic
     const char *name;                           // Long Name for OP
     
     enum operand_type_e src_type;               // Source Type

@@ -50,33 +50,41 @@ struct reg_definition_s {
     uint8_t shift;
 };
 
-// #define REG_DEF_AX { REG_AX, "ax", 0xFFFF, 0 }
-// #define REG_DEF_AL { REG_AX, "al", 0x00FF, 0 }
-// #define REG_DEF_AH { REG_AX, "ah", 0xFF00, 8 }
-// #define REG_DEF_BX { REG_BX, "bx", 0xFFFF, 0 }
-// #define REG_DEF_BL { REG_BX, "bl", 0x00FF, 0 }
-// #define REG_DEF_BH { REG_BX, "bh", 0xFF00, 8 }
-// #define REG_DEF_CX { REG_CX, "cx", 0xFFFF, 0 }
-// #define REG_DEF_CL { REG_CX, "cl", 0x00FF, 0 }
-// #define REG_DEF_CH { REG_CX, "ch", 0xFF00, 8 }
-// #define REG_DEF_DX { REG_DX, "dx", 0xFFFF, 0 }
-// #define REG_DEF_DL { REG_DX, "dl", 0x00FF, 0 }
-// #define REG_DEF_DH { REG_DX, "dh", 0xFF00, 8 }
-// #define REG_DEF_SP { REG_SP, "sp", 0xFFFF, 0 }
-// #define REG_DEF_BP { REG_BP, "bp", 0xFFFF, 0 }
-// #define REG_DEF_SI { REG_SI, "si", 0xFFFF, 0 }
-// #define REG_DEF_DI { REG_DI, "di", 0xFFFF, 0 }
+#define REG_DEF_AX { REG_AX, "ax", 0xFFFF, 0 }
+#define REG_DEF_AL { REG_AX, "al", 0x00FF, 0 }
+#define REG_DEF_AH { REG_AX, "ah", 0xFF00, 8 }
+#define REG_DEF_BX { REG_BX, "bx", 0xFFFF, 0 }
+#define REG_DEF_BL { REG_BX, "bl", 0x00FF, 0 }
+#define REG_DEF_BH { REG_BX, "bh", 0xFF00, 8 }
+#define REG_DEF_CX { REG_CX, "cx", 0xFFFF, 0 }
+#define REG_DEF_CL { REG_CX, "cl", 0x00FF, 0 }
+#define REG_DEF_CH { REG_CX, "ch", 0xFF00, 8 }
+#define REG_DEF_DX { REG_DX, "dx", 0xFFFF, 0 }
+#define REG_DEF_DL { REG_DX, "dl", 0x00FF, 0 }
+#define REG_DEF_DH { REG_DX, "dh", 0xFF00, 8 }
+#define REG_DEF_SP { REG_SP, "sp", 0xFFFF, 0 }
+#define REG_DEF_BP { REG_BP, "bp", 0xFFFF, 0 }
+#define REG_DEF_SI { REG_SI, "si", 0xFFFF, 0 }
+#define REG_DEF_DI { REG_DI, "di", 0xFFFF, 0 }
 
-// struct reg_definition_s register_map[8][2] = {
-//     { REG_DEF_AL, REG_DEF_AX },
-//     { REG_DEF_CL, REG_DEF_CX },
-//     { REG_DEF_DL, REG_DEF_DX },
-//     { REG_DEF_BL, REG_DEF_BX },
-//     { REG_DEF_AH, REG_DEF_SP },
-//     { REG_DEF_CH, REG_DEF_BP },
-//     { REG_DEF_DH, REG_DEF_SI },
-//     { REG_DEF_BH, REG_DEF_DI },
-// };
+struct reg_definition_s reg_item_map[MAX_REG] = {
+    REG_DEF_AX,
+    REG_DEF_AL,
+    REG_DEF_AH,
+    REG_DEF_BX,
+    REG_DEF_BL,
+    REG_DEF_BH,
+    REG_DEF_CX,
+    REG_DEF_CL,
+    REG_DEF_CH,
+    REG_DEF_DX,
+    REG_DEF_DL,
+    REG_DEF_DH,
+    REG_DEF_SP,
+    REG_DEF_BP,
+    REG_DEF_SI,
+    REG_DEF_DI,
+};
 
 
 uint16_t read_register(struct reg_definition_s item) {
@@ -85,18 +93,83 @@ uint16_t read_register(struct reg_definition_s item) {
     return (registers[item.reg] & mask) >> shift;
 }
 
-uint16_t write_register(struct reg_definition_s item, uint16_t value) {
-    uint16_t mask = item.mask;
-    uint8_t shift = item.shift;
-    uint16_t data = registers[item.reg] & ~mask;
+uint16_t write_register(struct reg_definition_s dst_item, uint16_t value) {
+    uint16_t mask = dst_item.mask;
+    uint8_t shift = dst_item.shift;
+    uint16_t data = registers[dst_item.reg] & ~mask;
     // printf("\t - mask 0x%x | shift %d | register[%s][0x%x] | data 0x%x\n", mask, shift, item.name, registers[item.reg], data);
     data |= (value<<shift) & mask;
-    registers[item.reg] = data;
-    return registers[item.reg];
+    registers[dst_item.reg] = data;
+    return registers[dst_item.reg];
 }
 
-bool parse_mov_inst(struct decoded_instruction_s *instruction) {
+bool parse_mov_inst(struct decoded_instruction_s *inst) {
     bool failed = false;
+    uint16_t dst_val;
+    uint16_t value;
+
+    switch (inst->dst_type) {
+        case TYPE_REGISTER:
+            struct reg_definition_s dst_reg = reg_item_map[inst->dst_register];
+            switch (inst->src_type) {
+                case TYPE_REGISTER:
+                    struct reg_definition_s src_reg = reg_item_map[inst->src_register];
+                    dst_val = read_register(dst_reg);
+                    value = read_register(src_reg);
+                    write_register(dst_reg, value);
+                    printf("%s %s, %s \t; %s:0x%04x -> 0x%04x\n", inst->op_name, 
+                        get_register_name(inst->dst_register), 
+                        get_register_name(inst->src_register), 
+                        get_register_name(inst->dst_register), 
+                        dst_val, value);
+                    break;
+                case TYPE_SEGMENT_REGISTER:
+                    dst_val = read_register(dst_reg);
+                    value = segment_registers[inst->src_seg_register];
+                    write_register(dst_reg, value);
+                    printf("%s %s, %s \t; %s:0x%04x -> 0x%04x\n", inst->op_name, 
+                        get_register_name(inst->dst_register), 
+                        get_segment_register_name(inst->src_seg_register), 
+                        get_register_name(inst->dst_register), 
+                        dst_val, value);
+                    break;
+                case TYPE_DATA:
+                    dst_val = read_register(dst_reg);
+                    write_register(dst_reg, inst->src_data);
+                    printf("%s %s, %d \t; %s:0x%04x -> 0x%04x\n", inst->op_name, 
+                        get_register_name(inst->dst_register), 
+                        inst->src_data, 
+                        get_register_name(inst->dst_register), 
+                        dst_val, inst->src_data&0xFFFF);
+                    break;
+                default:
+                    ERROR("Unhandled src_type[%d]\n", inst->src_type);
+                    break;
+            }
+            break;
+        case TYPE_SEGMENT_REGISTER:
+            switch (inst->src_type) {
+                case TYPE_REGISTER:
+                    struct reg_definition_s src_reg = reg_item_map[inst->src_register];
+                    segment_registers[inst->dst_seg_register] = read_register(src_reg);
+                    break;
+                case TYPE_SEGMENT_REGISTER:
+                    segment_registers[inst->dst_seg_register] = segment_registers[inst->src_seg_register];
+                    break;
+                case TYPE_DATA:
+                    segment_registers[inst->dst_seg_register] = inst->src_data;
+                    break;
+                default:
+                    ERROR("Unhandled src_type[%d]\n", inst->src_type);
+                    break;
+            }
+            break;
+        default:
+            ERROR("Unhandled dst_type[%d]\n", inst->dst_type);
+            break;
+    }
+
+
     return failed;
 }
 
@@ -185,7 +258,7 @@ int main (int argc, char *argv[]) {
         dump_instruction(&instruction, verbose);
 
         // print the instruction
-        print_decoded_instruction(&instruction);
+        // print_decoded_instruction(&instruction);
         LOG("; consumed [%zu]bytes | bytes_available [%zi]bytes\n", consumed, bytes_available);
         if (bytes_available<0) {
             ERROR("; ERROR: Decoder OVERRUN.\n; Decoder consumed past end of buffer\n");
