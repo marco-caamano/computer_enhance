@@ -82,6 +82,9 @@ struct reg_definition_s reg_item_map[MAX_REG] = {
     REG_DEF_DI,
 };
 
+/* Instruction Pointer */
+uint16_t ip = 0;
+
 /*
  * FLAGS
  * ZF   Zero Flag
@@ -411,15 +414,14 @@ int main (int argc, char *argv[]) {
     LOG("Starting Simulation:\n");
     LOG("--------------------\n");
 
-    uint8_t *ptr = (uint8_t *)&instruction_bitstream;
-
     while (bytes_available > 0) {
-        size_t consumed = decode_bitstream(ptr, bytes_available, verbose, &instruction);
+        uint8_t *ptr = (uint8_t *)&instruction_bitstream + ip;
+        size_t consumed = decode_bitstream((uint8_t *)&instruction_bitstream + ip, bytes_available, verbose, &instruction);
         if (consumed == 0) {
             ERROR("Failed to decode instruction at byte[%zu]->[0x%02x]\n", ptr-instruction_bitstream, *ptr);
         }
         bytes_available -= consumed;
-        ptr += consumed;
+        ip += consumed;
 
         // dump instruction internals
         dump_instruction(&instruction, verbose);
@@ -468,8 +470,8 @@ int main (int argc, char *argv[]) {
     LOG("\ndecode_bitstream consumed all %zu bytes from file\n", bytes_available);
 
     printf("\n");
-    printf("Registers:\n");
-    printf("----------\n");
+    printf("Final Registers:\n");
+    printf("----------------\n");
     printf("\tax: 0x%04x (%d)\n", registers[REG_AX], registers[REG_AX]);
     printf("\tbx: 0x%04x (%d)\n", registers[REG_BX], registers[REG_BX]);
     printf("\tcx: 0x%04x (%d)\n", registers[REG_CX], registers[REG_CX]);
@@ -479,12 +481,15 @@ int main (int argc, char *argv[]) {
     printf("\tsi: 0x%04x (%d)\n", registers[REG_SI], registers[REG_SI]);
     printf("\tdi: 0x%04x (%d)\n", registers[REG_DI], registers[REG_DI]);
     printf("\n");
-    printf("Segment Registers:\n");
-    printf("------------------\n");
     for (enum segment_register_e seg_reg=SEG_REG_ES; seg_reg<MAX_SEG_REG; seg_reg++) {
         printf("\t%s: 0x%04x (%d)\n", get_segment_register_name(seg_reg), segment_registers[seg_reg], segment_registers[seg_reg]);
     }
-    printf("\nFlags:[%s]\n", get_flags(flags));
+
+    printf("\n");
+
+    printf("\tip: 0x%04x (%d)\n\n", ip, ip);
+
+    printf("\tFlags:[%s]\n", get_flags(flags));
 
     printf("\n\n");
 
