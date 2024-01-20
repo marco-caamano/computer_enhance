@@ -140,6 +140,7 @@ struct decoded_instruction_s {
     enum instructions_e op;                     // Instruction encoded in opcode bitstream
     const char *op_name;                        // Instruction mnemonic
     const char *name;                           // Long Name for OP
+    uint8_t inst_num_bytes;                     // Number of Bytes the instruction uses
     
     enum operand_type_e src_type;               // Source Type
     enum register_e src_register;               // Source Register when src_type is TYPE_REGISTER
@@ -163,8 +164,6 @@ struct decoded_instruction_s {
     bool dst_needs_word_decorator;              // Destination Data needs to specify word decorator
 
     bool inst_is_short_w_data;                  // Decoded Instruction is a short instruction with data <inst_nemonic> <data>
-
-
 };
 
 

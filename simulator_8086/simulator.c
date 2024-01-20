@@ -149,14 +149,12 @@ uint16_t write_register(struct reg_definition_s dst_item, uint16_t value) {
     uint16_t mask = dst_item.mask;
     uint8_t shift = dst_item.shift;
     uint16_t data = registers[dst_item.reg] & ~mask;
-    // printf("\t - mask 0x%x | shift %d | register[%s][0x%x] | data 0x%x\n", mask, shift, item.name, registers[item.reg], data);
     data |= (value<<shift) & mask;
     registers[dst_item.reg] = data;
     return registers[dst_item.reg];
 }
 
-bool parse_sub_cmp_inst(struct decoded_instruction_s *inst, bool is_sub) {
-    bool failed = false;
+void parse_sub_cmp_inst(struct decoded_instruction_s *inst, bool is_sub) {
     uint16_t dst_val;
     uint16_t src_val;
     uint16_t value;
@@ -217,11 +215,11 @@ bool parse_sub_cmp_inst(struct decoded_instruction_s *inst, bool is_sub) {
             ERROR("Unhandled dst_type[%d]\n", inst->dst_type);
             break;
     }
-    return failed;
+    // advance IP register
+    ip += inst->inst_num_bytes;
 }
 
-bool parse_add_inst(struct decoded_instruction_s *inst) {
-    bool failed = false;
+void parse_add_inst(struct decoded_instruction_s *inst) {
     uint16_t dst_val;
     uint16_t src_val;
     uint16_t value;
@@ -253,11 +251,11 @@ bool parse_add_inst(struct decoded_instruction_s *inst) {
             ERROR("Unhandled dst_type[%d]\n", inst->dst_type);
             break;
     }
-    return failed;
+    // advance IP register
+    ip += inst->inst_num_bytes;
 }
 
-bool parse_mov_inst(struct decoded_instruction_s *inst) {
-    bool failed = false;
+void parse_mov_inst(struct decoded_instruction_s *inst) {
     uint16_t dst_val;
     uint16_t value;
 
@@ -304,13 +302,31 @@ bool parse_mov_inst(struct decoded_instruction_s *inst) {
             switch (inst->src_type) {
                 case TYPE_REGISTER:
                     struct reg_definition_s src_reg = reg_item_map[inst->src_register];
+                    dst_val = segment_registers[inst->dst_seg_register];
                     segment_registers[inst->dst_seg_register] = read_register(src_reg);
+                    printf("%s %s, %s \t; %s:0x%04x -> 0x%04x", inst->op_name,
+                        get_segment_register_name(inst->dst_seg_register),
+                        get_register_name(inst->src_register),
+                        get_segment_register_name(inst->dst_seg_register),
+                        dst_val, read_register(src_reg));
                     break;
                 case TYPE_SEGMENT_REGISTER:
+                    dst_val = segment_registers[inst->dst_seg_register];
                     segment_registers[inst->dst_seg_register] = segment_registers[inst->src_seg_register];
+                    printf("%s %s, %s \t; %s:0x%04x -> 0x%04x", inst->op_name,
+                        get_segment_register_name(inst->dst_seg_register),
+                        get_segment_register_name(inst->src_seg_register),
+                        get_segment_register_name(inst->dst_seg_register),
+                        dst_val, segment_registers[inst->dst_seg_register]);
                     break;
                 case TYPE_DATA:
+                    dst_val = segment_registers[inst->dst_seg_register];
                     segment_registers[inst->dst_seg_register] = inst->src_data;
+                    printf("%s %s, %d \t; %s:0x%04x -> 0x%04x", inst->op_name,
+                        get_segment_register_name(inst->dst_seg_register),
+                        inst->src_data,
+                        get_segment_register_name(inst->dst_seg_register),
+                        dst_val, inst->src_data);
                     break;
                 default:
                     ERROR("Unhandled src_type[%d]\n", inst->src_type);
@@ -321,9 +337,8 @@ bool parse_mov_inst(struct decoded_instruction_s *inst) {
             ERROR("Unhandled dst_type[%d]\n", inst->dst_type);
             break;
     }
-
-
-    return failed;
+    // advance IP register
+    ip += inst->inst_num_bytes;
 }
 
 
@@ -341,7 +356,6 @@ int main (int argc, char *argv[]) {
     FILE *in_fp = NULL;
     size_t bytes_available;
     struct decoded_instruction_s instruction = {};
-    bool failed;
 
     while( (opt = getopt(argc, argv, "hi:vt")) != -1) {
         switch (opt) {
@@ -399,55 +413,37 @@ int main (int argc, char *argv[]) {
     LOG("Starting Simulation:\n");
     LOG("--------------------\n");
 
-    while (bytes_available > 0) {
+    ip = 0;
+
+    while (ip < bytes_available) {
         uint8_t *ptr = (uint8_t *)&instruction_bitstream + ip;
         uint8_t prev_ip = ip;
         uint16_t pref_flags = flags;
+
         size_t consumed = decode_bitstream((uint8_t *)&instruction_bitstream + ip, bytes_available, verbose, &instruction);
         if (consumed == 0) {
             ERROR("Failed to decode instruction at byte[%zu]->[0x%02x]\n", ptr-instruction_bitstream, *ptr);
         }
-        bytes_available -= consumed;
-        ip += consumed;
 
         // dump instruction internals
         dump_instruction(&instruction, verbose);
 
-        // print the instruction
-        // print_decoded_instruction(&instruction);
-        LOG("; consumed [%zu]bytes | bytes_available [%zi]bytes\n", consumed, bytes_available);
-        if (bytes_available<0) {
-            ERROR("; ERROR: Decoder OVERRUN.\n; Decoder consumed past end of buffer\n");
-        }
-
         switch (instruction.op) {
             case MOV_INST:
                 LOG("Found %s MOV Instruction, parsing...\n", instruction.name);
-                failed = parse_mov_inst(&instruction);
-                if (failed) {
-                    ERROR("Failed to parse MOV instruction\n");
-                }
+                parse_mov_inst(&instruction);
                 break;
             case SUB_INST:
                 LOG("Found %s SUB Instruction, parsing...\n", instruction.name);
-                failed = parse_sub_cmp_inst(&instruction, true);
-                if (failed) {
-                    ERROR("Failed to parse SUB instruction\n");
-                }
+                parse_sub_cmp_inst(&instruction, true);
                 break;
             case CMP_INST:
                 LOG("Found %s CMP Instruction, parsing...\n", instruction.name);
-                failed = parse_sub_cmp_inst(&instruction, false);
-                if (failed) {
-                    ERROR("Failed to parse CMP instruction\n");
-                }
+                parse_sub_cmp_inst(&instruction, false);
                 break;
             case ADD_INST:
                 LOG("Found %s ADD Instruction, parsing...\n", instruction.name);
-                failed = parse_add_inst(&instruction);
-                if (failed) {
-                    ERROR("Failed to parse ADD instruction\n");
-                }
+                parse_add_inst(&instruction);
                 break;
             default:
                 ERROR("Unsupported instruction [%s][%s]\n", instruction.name, instruction.op_name);

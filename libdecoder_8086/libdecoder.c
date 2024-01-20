@@ -203,6 +203,7 @@ void reset_instruction(struct decoded_instruction_s *inst) {
     inst->op = MAX_INST;
     inst->name = "";
     inst->op_name = "";
+    inst->inst_num_bytes = 0;
     inst->src_type = MAX_TYPE;
     inst->src_register = MAX_REG;
     inst->src_seg_register = MAX_SEG_REG;
@@ -229,6 +230,7 @@ void dump_instruction(struct decoded_instruction_s *inst, bool verbose) {
     LOG("; Dump Instruction:\n");
     LOG("; op                          %s\n", instruction_name[inst->op]);
     LOG("; op_name                     %s\n", inst->op_name);
+    LOG("; num_bytes                   %d\n", inst->inst_num_bytes);
     LOG("; description                 %s\n", inst->name);
     LOG("; src_type                    %s\n", type_str[inst->src_type]);
     LOG("; src_register                %s\n", register_name[inst->src_register]);
@@ -986,6 +988,8 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool ver
 
 
     }
+
+    inst_result->inst_num_bytes = consumed_bytes;
 
     return consumed_bytes;
 }
