@@ -9,13 +9,14 @@
 
 #include "libdecoder.h"
 
-/* 8086 can address up to 1MB of Memory
- * We allocate a 1MB buffer and load the instructions 
- * to the start of memory and then start executing from
- * there
+/* 8086 can address up to 1MB of Memory, but since we 
+ * are not going to use the segment registers we will
+ * limit to the 16bit address space of 64KB addressable
+ * memory
  */
-#define MEMORY_SIZE 1024*1024
+#define MEMORY_SIZE 64*1024
 
+#define STR_BUFFER_SIZE     512
 
 #define DUMP_SEGMENT_REGS() {               \
     if (verbose && trace) {                 \
@@ -265,10 +266,10 @@ void parse_mov_inst(struct decoded_instruction_s *inst) {
     switch (inst->dst_type) {
         case TYPE_REGISTER:
             struct reg_definition_s dst_reg = reg_item_map[inst->dst_register];
+            dst_val = read_register(dst_reg);
             switch (inst->src_type) {
                 case TYPE_REGISTER:
                     struct reg_definition_s src_reg = reg_item_map[inst->src_register];
-                    dst_val = read_register(dst_reg);
                     value = read_register(src_reg);
                     write_register(dst_reg, value);
                     printf("%s %s, %s \t; %s:0x%04x -> 0x%04x", inst->op_name, 
@@ -278,7 +279,6 @@ void parse_mov_inst(struct decoded_instruction_s *inst) {
                         dst_val, value);
                     break;
                 case TYPE_SEGMENT_REGISTER:
-                    dst_val = read_register(dst_reg);
                     value = segment_registers[inst->src_seg_register];
                     write_register(dst_reg, value);
                     printf("%s %s, %s \t; %s:0x%04x -> 0x%04x", inst->op_name, 
@@ -288,13 +288,21 @@ void parse_mov_inst(struct decoded_instruction_s *inst) {
                         dst_val, value);
                     break;
                 case TYPE_DATA:
-                    dst_val = read_register(dst_reg);
                     write_register(dst_reg, inst->src_data);
-                    printf("%s %s, %d \t; %s:0x%04x -> 0x%04x", inst->op_name, 
+                    printf("%s %s, %d \t\t; %s:0x%04x -> 0x%04x\t", inst->op_name, 
                         get_register_name(inst->dst_register), 
                         inst->src_data, 
                         get_register_name(inst->dst_register), 
                         dst_val, inst->src_data&0xFFFF);
+                    break;
+                case TYPE_DIRECT_ADDRESS:
+                    value = memory[inst->src_direct_address];
+                    write_register(dst_reg, value);
+                    printf("%s %s, [%d] \t\t; %s:0x%04x -> 0x%04x\t", inst->op_name, 
+                        get_register_name(inst->dst_register), 
+                        inst->src_direct_address, 
+                        get_register_name(inst->dst_register), 
+                        dst_val, value);
                     break;
                 default:
                     ERROR("Unhandled src_type[%d]\n", inst->src_type);
@@ -330,6 +338,61 @@ void parse_mov_inst(struct decoded_instruction_s *inst) {
                         inst->src_data,
                         get_segment_register_name(inst->dst_seg_register),
                         dst_val, inst->src_data);
+                    break;
+                default:
+                    ERROR("Unhandled src_type[%d]\n", inst->src_type);
+                    break;
+            }
+            break;
+        case TYPE_DIRECT_ADDRESS:
+            switch (inst->src_type) {
+                case TYPE_DATA:
+                    dst_val = memory[inst->dst_direct_address];
+                    memory[inst->dst_direct_address] = inst->src_data;
+                    printf("%s [%d], %d \t\t; [0x%04x]:0x%04x -> 0x%04x", inst->op_name,
+                        inst->dst_direct_address,
+                        inst->src_data,
+                        inst->dst_direct_address,
+                        dst_val, inst->src_data);
+                    break;
+                default:
+                    ERROR("Unhandled src_type[%d]\n", inst->src_type);
+                    break;
+            }
+            break;
+        case TYPE_EFFECTIVE_ADDRESS:
+            uint16_t dst_addr = 0;
+            const char *dst_reg1_str = NULL;
+            const char *dst_reg2_str = NULL;
+            if (inst->dst_effective_reg1 != MAX_REG) {
+                dst_addr += read_register(reg_item_map[inst->dst_effective_reg1]);
+                dst_reg1_str = get_register_name(inst->dst_effective_reg1);
+            }
+            if (inst->dst_effective_reg2 != MAX_REG) {
+                dst_addr += read_register(reg_item_map[inst->dst_effective_reg2]);
+                dst_reg2_str = get_register_name(inst->dst_effective_reg2);
+            }
+            dst_addr += inst->dst_effective_displacement;
+            switch (inst->src_type) {
+                case TYPE_DATA:
+                    char output[STR_BUFFER_SIZE] = {0};
+                    dst_val = memory[dst_addr];
+                    memory[dst_addr] = inst->src_data;
+                    if (inst->dst_effective_displacement!=0) {
+                        snprintf((char *)&output, STR_BUFFER_SIZE, "%s [%s%s%s%s%d], %d \t\t; \t\t\t", inst->op_name,
+                            dst_reg1_str ? dst_reg1_str : "",
+                            dst_reg2_str ? "+" : "",
+                            dst_reg2_str ? dst_reg2_str : "",
+                            (inst->dst_effective_displacement>0) ? "+" : "",
+                            inst->dst_effective_displacement, inst->src_data);
+                        
+                    } else {
+                        snprintf((char *)&output, STR_BUFFER_SIZE, "%s [%s%s%s], %d \t\t; \t\t\t", inst->op_name,
+                            dst_reg1_str ? dst_reg1_str : "",
+                            dst_reg2_str ? "+" : "",
+                            dst_reg2_str ? dst_reg2_str : "", inst->src_data);
+                    }
+                    printf("%s", output);
                     break;
                 default:
                     ERROR("Unhandled src_type[%d]\n", inst->src_type);
