@@ -104,6 +104,9 @@ uint16_t ip = 0;
 
 uint16_t flags = 0;
 
+#define IS_Z_SET()  (((flags & ZERO_FLAG_MASK)>>ZERO_FLAG_SHIFT)==0x1)
+#define IS_S_SET()  (((flags & SIGNED_FLAG_MASK)>>SIGNED_FLAG_SHIFT)==0x1)
+
 void eval_flags(uint16_t value) {
     if (value==0) {
         // set zero flag
@@ -341,6 +344,23 @@ void parse_mov_inst(struct decoded_instruction_s *inst) {
     ip += inst->inst_num_bytes;
 }
 
+void parse_jmp_inst(struct decoded_instruction_s *inst) {
+    // advance IP register
+    ip += inst->inst_num_bytes;
+    switch (inst->op) {
+        case JNZ_INST:
+            if (!IS_Z_SET()) {
+                // jump on not zero
+                ip += inst->src_data;
+            }
+            printf("%s %d \t\t;\t\t ", inst->op_name, (inst->src_data + inst->inst_num_bytes));
+            break;
+        default:
+            ERROR("Unsupported Instruction[%s]\n", inst->op_name);
+            break;
+    }
+}
+
 
 void usage(void) {
     fprintf(stderr, "8086 Instruction Simulator Usage:\n");
@@ -427,23 +447,42 @@ int main (int argc, char *argv[]) {
 
         // dump instruction internals
         dump_instruction(&instruction, verbose);
+        LOG("Found [%s][%s] Instruction, parsing...\n", instruction.op_name, instruction.name);
 
         switch (instruction.op) {
             case MOV_INST:
-                LOG("Found %s MOV Instruction, parsing...\n", instruction.name);
                 parse_mov_inst(&instruction);
                 break;
             case SUB_INST:
-                LOG("Found %s SUB Instruction, parsing...\n", instruction.name);
                 parse_sub_cmp_inst(&instruction, true);
                 break;
             case CMP_INST:
-                LOG("Found %s CMP Instruction, parsing...\n", instruction.name);
                 parse_sub_cmp_inst(&instruction, false);
                 break;
             case ADD_INST:
-                LOG("Found %s ADD Instruction, parsing...\n", instruction.name);
                 parse_add_inst(&instruction);
+                break;
+            case JNO_INST:
+            case JB_INST:
+            case JNB_INST:
+            case JE_INST:
+            case JNZ_INST:
+            case JBE_INST:
+            case JA_INST:
+            case JS_INST:
+            case JNS_INST:
+            case JP_INST:
+            case JNP_INST:
+            case JL_INST:
+            case JNL_INST:
+            case JLE_INST:
+            case JG_INST:
+            case LOOPNZ_INST:
+            case LOOPZ_INST:
+            case LOOP_INST:
+            case JCXZ_INST:
+                parse_jmp_inst(&instruction);
+                break;
                 break;
             default:
                 ERROR("Unsupported instruction [%s][%s]\n", instruction.name, instruction.op_name);

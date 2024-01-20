@@ -969,7 +969,7 @@ size_t parse_instruction(uint8_t *ptr, struct opcode_bitstream_s *cmd,  bool ver
         // Short instruction encode the offset in the next byte
         // extract data
         bool is_8bit = true;
-        bool is_signed_extended = false;
+        bool is_signed_extended = true;
         consumed = extract_data(ptr, is_8bit, is_signed_extended, &inst_result->src_data, consumed_bytes, verbose);
         consumed_bytes += consumed;
         ptr += consumed;
