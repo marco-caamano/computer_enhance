@@ -33,7 +33,6 @@ bool verbose = false;
 bool trace = false;
 
 uint8_t memory[MEMORY_SIZE] = {0};
-uint8_t instruction_bitstream[MEMORY_SIZE] = {0};
 
 uint16_t registers[MAX_REG] = { 0 };
 
@@ -143,7 +142,7 @@ char *get_flags(uint16_t value) {
     }
 }
 
-void dump_memory(void) {
+void dump_nonzoer_memory(void) {
     // only dump when non-zero
     for (int offset=0; offset<(MEMORY_SIZE/sizeof(uint16_t)); offset+=2) {
         if (memory[offset]!=0) {
@@ -214,7 +213,7 @@ void parse_sub_cmp_inst(struct decoded_instruction_s *inst, bool is_sub) {
                             dst_val,
                             value);
                     } else {
-                        printf("%s %s, %d \t; ", 
+                        printf("%s %s, %d \t\t; \t\t\t", 
                             inst->op_name, 
                             get_register_name(inst->dst_register), 
                             src_val);
@@ -474,7 +473,7 @@ void parse_mov_inst(struct decoded_instruction_s *inst) {
                     dst_val = memory[dst_addr];
                     memory[dst_addr] = value;
                     if (inst->dst_effective_displacement!=0) {
-                        snprintf((char *)&output, STR_BUFFER_SIZE, "%s [%s%s%s%s%d], %s \t; [%d]:0x%04x -> 0x%04x",
+                        snprintf((char *)&output, STR_BUFFER_SIZE, "%s [%s%s%s%s%d], %s \t\t; [%d]:0x%04x -> 0x%04x",
                             inst->op_name,
                             dst_reg1_str ? dst_reg1_str : "",
                             dst_reg2_str ? "+" : "",
@@ -485,7 +484,7 @@ void parse_mov_inst(struct decoded_instruction_s *inst) {
                             dst_addr, dst_val, value);
                         
                     } else {
-                        snprintf((char *)&output, STR_BUFFER_SIZE, "%s [%s%s%s], %s \t; [%d]:0x%04x -> 0x%04x",
+                        snprintf((char *)&output, STR_BUFFER_SIZE, "%s [%s%s%s], %s \t\t; [%d]:0x%04x -> 0x%04x",
                             inst->op_name,
                             dst_reg1_str ? dst_reg1_str : "",
                             dst_reg2_str ? "+" : "",
@@ -536,7 +535,7 @@ void parse_jmp_inst(struct decoded_instruction_s *inst) {
                 // jump on not zero
                 ip += inst->src_data;
             }
-            printf("%s %d \t\t\t;\t\t\t ", inst->op_name, (inst->src_data + inst->inst_num_bytes));
+            printf("%s %d \t\t;\t\t\t ", inst->op_name, (inst->src_data + inst->inst_num_bytes));
             break;
         default:
             ERROR("Unsupported Instruction[%s]\n", inst->op_name);
@@ -549,6 +548,8 @@ void usage(void) {
     fprintf(stderr, "8086 Instruction Simulator Usage:\n");
     fprintf(stderr, "-h         This help dialog.\n");
     fprintf(stderr, "-i <file>  Path to file to parse.\n");
+    fprintf(stderr, "-o <file>  Path to output file. Dumps the contents of the memory to the file at the end if the run.\n");
+    fprintf(stderr, "-m         Dump NonZero Memory to console at the end of the run.\n");
     fprintf(stderr, "-v         Enable verbose output.\n");
     fprintf(stderr, "-t         Enable trace output. Add line numbers to verbose logs.\n");
 }
@@ -556,11 +557,15 @@ void usage(void) {
 int main (int argc, char *argv[]) {
     int opt;
     char *input_file = NULL;
+    char *output_file = NULL;
+    bool dump_memory = false;
+    bool dump_file = false;
     FILE *in_fp = NULL;
+    FILE *out_fp = NULL;
     size_t bytes_available;
     struct decoded_instruction_s instruction = {};
 
-    while( (opt = getopt(argc, argv, "hi:vt")) != -1) {
+    while( (opt = getopt(argc, argv, "hi:mo:vt")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
@@ -569,6 +574,15 @@ int main (int argc, char *argv[]) {
             
             case 'i':
                 input_file = strdup(optarg);
+                break;
+
+            case 'o':
+                dump_file = true;
+                output_file = strdup(optarg);
+                break;
+
+            case 'm':
+                dump_memory = true;
                 break;
 
             case 'v':
@@ -598,6 +612,12 @@ int main (int argc, char *argv[]) {
     }
 
     LOG("Using Input Filename     [%s]\n", input_file);
+    if (dump_file) {
+        LOG("Using Output Filename    [%s]\n", output_file);
+    }
+    if (dump_memory) {
+        LOG("Dumping NonZero Memory Enabled\n");
+    }
     LOG("\n\n");
 
     in_fp = fopen(input_file, "r");
@@ -608,7 +628,7 @@ int main (int argc, char *argv[]) {
 
     LOG("Opened Input file[%s] OK\n", input_file);
 
-    bytes_available = fread((uint8_t *)&instruction_bitstream, 1, MEMORY_SIZE, in_fp);
+    bytes_available = fread((uint8_t *)&memory, 1, MEMORY_SIZE, in_fp);
     fclose(in_fp);
 
     LOG("Read [%zu] bytes from file\n\n", bytes_available);
@@ -619,13 +639,13 @@ int main (int argc, char *argv[]) {
     ip = 0;
 
     while (ip < bytes_available) {
-        uint8_t *ptr = (uint8_t *)&instruction_bitstream + ip;
+        uint8_t *ptr = (uint8_t *)&memory + ip;
         uint8_t prev_ip = ip;
         uint16_t pref_flags = flags;
 
-        size_t consumed = decode_bitstream((uint8_t *)&instruction_bitstream + ip, bytes_available, verbose, &instruction);
+        size_t consumed = decode_bitstream((uint8_t *)&memory + ip, bytes_available, verbose, &instruction);
         if (consumed == 0) {
-            ERROR("Failed to decode instruction at byte[%zu]->[0x%02x]\n", ptr-instruction_bitstream, *ptr);
+            ERROR("Failed to decode instruction at byte[%zu]->[0x%02x]\n", ptr-memory, *ptr);
         }
 
         // dump instruction internals
@@ -702,12 +722,27 @@ int main (int argc, char *argv[]) {
 
     printf("\tFlags:[%s]\n", get_flags(flags));
 
-    printf("\n");
+    if (dump_memory) {
+        printf("\n");
+        printf("NonZero Memory:\n");
+        printf("---------------\n");
+        dump_nonzoer_memory();
+    }
 
-    printf("NonZero Memory:\n");
-    printf("---------------\n");
+    if (dump_file) {
+        out_fp = fopen(output_file, "w");
+        if (!out_fp) {
+            fprintf(stderr, "ERROR output_file fopen failed [%d][%s]\n", errno, strerror(errno));
+            exit(1);
+        }
 
-    dump_memory();
+        LOG("Opened Output file[%s] OK\n", output_file);
+
+        bytes_available = fwrite((uint8_t *)&memory, 1, MEMORY_SIZE, out_fp);
+        printf("\n\nWrote %zu bytes to [%s]\n", bytes_available, output_file);
+
+        fclose(in_fp);
+    }
 
     printf("\n\n");
 
