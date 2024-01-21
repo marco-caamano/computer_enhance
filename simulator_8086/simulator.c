@@ -214,7 +214,6 @@ void parse_sub_cmp_inst(struct decoded_instruction_s *inst, bool is_sub) {
                             dst_val,
                             value);
                     } else {
-                        printf("[%d]", __LINE__);
                         printf("%s %s, %d \t; ", 
                             inst->op_name, 
                             get_register_name(inst->dst_register), 
@@ -270,6 +269,41 @@ void parse_add_inst(struct decoded_instruction_s *inst) {
                         dst_val,
                         value);
                     break;
+                case TYPE_EFFECTIVE_ADDRESS:
+                    uint16_t src_addr = 0;
+                    const char *src_reg1_str = NULL;
+                    const char *src_reg2_str = NULL;
+                    char output[STR_BUFFER_SIZE] = {0};
+                    if (inst->src_effective_reg1 != MAX_REG) {
+                        src_addr += read_register(reg_item_map[inst->src_effective_reg1]);
+                        src_reg1_str = get_register_name(inst->src_effective_reg1);
+                    }
+                    if (inst->src_effective_reg2 != MAX_REG) {
+                        src_addr += read_register(reg_item_map[inst->src_effective_reg2]);
+                        src_reg2_str = get_register_name(inst->src_effective_reg2);
+                    }
+                    src_addr += inst->dst_effective_displacement;
+                    value = dst_val + memory[src_addr];
+                    write_register(dst_reg, value);
+                    if (inst->src_effective_displacement!=0) {
+                        snprintf((char *)&output, STR_BUFFER_SIZE, "%s %s, [%s%s%s%s%d] \t\t; \t\t\t", inst->op_name,
+                            get_register_name(inst->dst_register),
+                            src_reg1_str ? src_reg1_str : "",
+                            src_reg2_str ? "+" : "",
+                            src_reg2_str ? src_reg2_str : "",
+                            (inst->src_effective_displacement>0) ? "+" : "",
+                            inst->src_effective_displacement);
+                    } else {
+                        snprintf((char *)&output, STR_BUFFER_SIZE, "%s %s, [%s%s%s] \t; %s:0x%04x -> 0x%04x\t", inst->op_name,
+                            get_register_name(inst->dst_register),
+                            src_reg1_str ? src_reg1_str : "",
+                            src_reg2_str ? "+" : "",
+                            src_reg2_str ? src_reg2_str : "",
+                            get_register_name(inst->dst_register),
+                            dst_val, value);
+                    }
+                    printf("%s", output);
+                    break;
                 default:
                     ERROR("Unhandled src_type[%d]\n", inst->src_type);
                     break;
@@ -296,7 +330,7 @@ void parse_mov_inst(struct decoded_instruction_s *inst) {
                     struct reg_definition_s src_reg = reg_item_map[inst->src_register];
                     value = read_register(src_reg);
                     write_register(dst_reg, value);
-                    printf("%s %s, %s \t; %s:0x%04x -> 0x%04x", inst->op_name, 
+                    printf("%s %s, %s \t\t; %s:0x%04x -> 0x%04x \t", inst->op_name,
                         get_register_name(inst->dst_register), 
                         get_register_name(inst->src_register), 
                         get_register_name(inst->dst_register), 
@@ -345,7 +379,6 @@ void parse_mov_inst(struct decoded_instruction_s *inst) {
                     value = memory[src_addr];
                     write_register(dst_reg, value);
                     if (inst->src_effective_displacement!=0) {
-                        printf("[%d]", __LINE__);
                         snprintf((char *)&output, STR_BUFFER_SIZE, "%s %s, [%s%s%s%s%d] \t\t; \t\t\t", inst->op_name,
                             get_register_name(inst->dst_register),
                             src_reg1_str ? src_reg1_str : "",
