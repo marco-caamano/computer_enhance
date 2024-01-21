@@ -537,6 +537,23 @@ void parse_jmp_inst(struct decoded_instruction_s *inst) {
             }
             printf("%s %d \t\t;\t\t\t ", inst->op_name, (inst->src_data + inst->inst_num_bytes));
             break;
+        case LOOP_INST:
+            // loop CX times
+            // we decrement CX by one then compare to zero
+            // if not equal to zero then jump
+            uint16_t cx_val = read_register(reg_item_map[REG_CX]);
+            uint16_t old_val = cx_val;
+            cx_val -= 1;
+            write_register(reg_item_map[REG_CX], cx_val);
+            eval_flags(cx_val);
+            if (!IS_Z_SET()) {
+                // jump on not zero
+                ip += inst->src_data;
+            }
+            printf("%s %d \t\t; cx:0x%04x -> 0x%04x\t ", inst->op_name, 
+            (inst->src_data + inst->inst_num_bytes), old_val, cx_val);
+
+            break;
         default:
             ERROR("Unsupported Instruction[%s]\n", inst->op_name);
             break;
