@@ -38,6 +38,8 @@ uint16_t registers[MAX_REG] = { 0 };
 
 uint16_t segment_registers[MAX_SEG_REG] = { 0 };
 
+uint16_t total_clocks = 0;
+
 
 struct reg_definition_s {
     enum register_e reg;
@@ -151,6 +153,70 @@ void dump_nonzoer_memory(void) {
     }
 }
 
+// determine the number of clock cycles for an effective address calculation
+// econding table at page 66 of Intel 8086 manual
+uint8_t get_ea_clocks(struct decoded_instruction_s *inst) {
+    bool has_disp = false;
+    bool has_bx = false;
+    bool has_bp = false;
+    bool has_si = false;
+    bool has_di = false;
+    if (inst->dst_type == TYPE_EFFECTIVE_ADDRESS) {
+        if (inst->dst_effective_displacement!=0) has_disp = true;
+        if (inst->dst_effective_reg1==REG_BX || inst->dst_effective_reg2==REG_BX) has_bx=true;
+        if (inst->dst_effective_reg1==REG_BP || inst->dst_effective_reg2==REG_BP) has_bp=true;
+        if (inst->dst_effective_reg1==REG_SI || inst->dst_effective_reg2==REG_SI) has_si=true;
+        if (inst->dst_effective_reg1==REG_DI || inst->dst_effective_reg2==REG_DI) has_di=true;
+    } else if (inst->src_type == TYPE_EFFECTIVE_ADDRESS) {
+        if (inst->src_effective_displacement!=0) has_disp = true;
+        if (inst->src_effective_reg1==REG_BX || inst->src_effective_reg2==REG_BX) has_bx=true;
+        if (inst->src_effective_reg1==REG_BP || inst->src_effective_reg2==REG_BP) has_bp=true;
+        if (inst->src_effective_reg1==REG_SI || inst->src_effective_reg2==REG_SI) has_si=true;
+        if (inst->src_effective_reg1==REG_DI || inst->src_effective_reg2==REG_DI) has_di=true;
+    } else if (inst->src_type == TYPE_DIRECT_ADDRESS) {
+        // direct address like only displacement
+        return 6;
+    }
+    if (has_disp && !has_bx && !has_bp && !has_si && !has_di) {
+        // displacement only
+        return 6;
+    }
+    uint8_t comb = 0;
+    if (has_bx) comb = 1;
+    if (has_bp) comb |= 1<<1;
+    if (has_si) comb |= 1<<2;
+    if (has_di) comb |= 1<<3;
+    if (comb==1 || comb==2 || comb==4 || comb==8) {
+        if (!has_disp) {
+            // Base or Index Only
+            return 5;
+        } else {
+            // Base or Index + Displacement
+            return 9;
+        }
+    }
+    if ((has_bp && has_di) || (has_bx && has_si)) {
+        if (!has_disp) {
+            // Base + Index
+            return 7;
+        } else {
+            // Base + Index + Displacement
+            return 11;
+        }
+    }
+    if ((has_bp && has_si) || (has_bx && has_di)) {
+        if (!has_disp) {
+            // Base + Index
+            return 8;
+        } else {
+            // Base + Index + Displacement
+            return 12;
+        }
+    }
+    ERROR("Invalid Decoding of Effective Address\n");
+    return 0;
+}
+
 
 uint16_t read_register(struct reg_definition_s item) {
     uint16_t mask = item.mask;
@@ -236,6 +302,10 @@ void parse_add_inst(struct decoded_instruction_s *inst) {
     uint16_t dst_val;
     uint16_t src_val;
     uint16_t value;
+    uint8_t clocks = 0;
+    uint8_t ea_clocks = 0;
+    uint8_t p_clocks = 0;
+    char *p_clocks_str ="";
 
     switch (inst->dst_type) {
         case TYPE_REGISTER:
@@ -243,6 +313,8 @@ void parse_add_inst(struct decoded_instruction_s *inst) {
             dst_val = read_register(dst_reg);
             switch (inst->src_type) {
                 case TYPE_DATA:
+                    clocks = 4;
+                    total_clocks += clocks;
                     src_val = inst->src_data;
                     value = dst_val + src_val;
                     eval_flags(value);
@@ -254,8 +326,11 @@ void parse_add_inst(struct decoded_instruction_s *inst) {
                         get_register_name(inst->dst_register), 
                         dst_val,
                         value);
+                    printf(" Clocks: +%d = %d ", clocks, total_clocks);
                     break;
                 case TYPE_REGISTER:
+                    clocks = 3;
+                    total_clocks += clocks;
                     src_val = read_register(reg_item_map[inst->src_register]);
                     value = dst_val + src_val;
                     eval_flags(value);
@@ -267,12 +342,15 @@ void parse_add_inst(struct decoded_instruction_s *inst) {
                         get_register_name(inst->dst_register),
                         dst_val,
                         value);
+                    printf(" Clocks: +%d = %d ", clocks, total_clocks);
                     break;
                 case TYPE_EFFECTIVE_ADDRESS:
                     uint16_t src_addr = 0;
                     const char *src_reg1_str = NULL;
                     const char *src_reg2_str = NULL;
                     char output[STR_BUFFER_SIZE] = {0};
+                    clocks = 9;
+                    ea_clocks = get_ea_clocks(inst);
                     if (inst->src_effective_reg1 != MAX_REG) {
                         src_addr += read_register(reg_item_map[inst->src_effective_reg1]);
                         src_reg1_str = get_register_name(inst->src_effective_reg1);
@@ -281,9 +359,16 @@ void parse_add_inst(struct decoded_instruction_s *inst) {
                         src_addr += read_register(reg_item_map[inst->src_effective_reg2]);
                         src_reg2_str = get_register_name(inst->src_effective_reg2);
                     }
-                    src_addr += inst->dst_effective_displacement;
+                    src_addr += inst->src_effective_displacement;
                     value = dst_val + memory[src_addr];
                     write_register(dst_reg, value);
+                    if (src_addr % 2 != 0) {
+                        // odd memory address and 1 transfer
+                        // add 4 clocks penalty
+                        p_clocks = 4;
+                        p_clocks_str = " +4p";
+                    }
+                    total_clocks += clocks + ea_clocks + p_clocks;
                     if (inst->src_effective_displacement!=0) {
                         snprintf((char *)&output, STR_BUFFER_SIZE, "%s %s, [%s%s%s%s%d] \t\t; \t\t\t", inst->op_name,
                             get_register_name(inst->dst_register),
@@ -302,6 +387,83 @@ void parse_add_inst(struct decoded_instruction_s *inst) {
                             dst_val, value);
                     }
                     printf("%s", output);
+                    printf(" Clocks: +%d(%d +%dea%s) = %d ", (clocks+ea_clocks), clocks, ea_clocks, p_clocks_str, total_clocks);
+                    break;
+                default:
+                    ERROR("Unhandled src_type[%d]\n", inst->src_type);
+                    break;
+            }
+            break;
+        case TYPE_EFFECTIVE_ADDRESS:
+            uint16_t dst_addr = inst->dst_effective_displacement;
+            const char *dst_reg1_str = NULL;
+            const char *dst_reg2_str = NULL;
+            char output[STR_BUFFER_SIZE] = {0};
+            if (inst->dst_effective_reg1 != MAX_REG) {
+                dst_addr += read_register(reg_item_map[inst->dst_effective_reg1]);
+                dst_reg1_str = get_register_name(inst->dst_effective_reg1);
+            }
+            if (inst->dst_effective_reg2 != MAX_REG) {
+                dst_addr += read_register(reg_item_map[inst->dst_effective_reg2]);
+                dst_reg2_str = get_register_name(inst->dst_effective_reg2);
+            }
+            dst_val = memory[dst_addr];
+            if (dst_addr % 2 != 0) {
+                // odd memory address and 2 transfers
+                // add 8 clocks penalty
+                p_clocks = 8;
+                p_clocks_str = " +8p";
+            }
+            switch (inst->src_type) {
+                case TYPE_REGISTER:
+                    struct reg_definition_s src_reg = reg_item_map[inst->src_register];
+                    src_val = read_register(src_reg);
+                    memory[dst_addr] += src_val;
+                    clocks = 16;
+                    ea_clocks = get_ea_clocks(inst);
+                    total_clocks += clocks + ea_clocks + p_clocks;
+                    if (inst->dst_effective_displacement!=0) {
+                        snprintf((char *)&output, STR_BUFFER_SIZE, "%s [%s%s%s%s%d], %s \t; [%d]:0x%04x -> 0x%04x\t", inst->op_name,
+                            dst_reg1_str ? dst_reg1_str : "",
+                            dst_reg2_str ? "+" : "",
+                            dst_reg2_str ? dst_reg2_str : "",
+                            (inst->dst_effective_displacement>0) ? "+" : "",
+                            inst->dst_effective_displacement,
+                            get_register_name(inst->src_register),
+                            dst_addr, dst_val, src_val);
+                    } else {
+                        snprintf((char *)&output, STR_BUFFER_SIZE, "%s [%s%s%s], %s \t; [%d]:0x%04x -> 0x%04x\t", inst->op_name,
+                            dst_reg1_str ? dst_reg1_str : "",
+                            dst_reg2_str ? "+" : "",
+                            dst_reg2_str ? dst_reg2_str : "",
+                            get_register_name(inst->src_register),
+                            dst_addr, dst_val, src_val);
+                    }
+                    printf("%s", output);
+                    printf(" Clocks: +%d(%d +%dea%s) = %d ", (clocks+ea_clocks), clocks, ea_clocks, p_clocks_str, total_clocks);
+                    break;
+                case TYPE_DATA:
+                    memory[dst_addr] += inst->src_data;
+                    clocks = 17;
+                    ea_clocks = get_ea_clocks(inst);
+                    total_clocks += clocks + ea_clocks + p_clocks;
+                    if (inst->dst_effective_displacement!=0) {
+                        snprintf((char *)&output, STR_BUFFER_SIZE, "%s [%s%s%s%s%d], %d \t; [%d]:0x%04x -> 0x%04x\t", inst->op_name,
+                            dst_reg1_str ? dst_reg1_str : "",
+                            dst_reg2_str ? "+" : "",
+                            dst_reg2_str ? dst_reg2_str : "",
+                            (inst->dst_effective_displacement>0) ? "+" : "",
+                            inst->dst_effective_displacement,
+                            inst->src_data, dst_addr, dst_val, inst->src_data);
+                    } else {
+                        snprintf((char *)&output, STR_BUFFER_SIZE, "%s [%s%s%s], %d \t; [%d]:0x%04x -> 0x%04x\t", inst->op_name,
+                            dst_reg1_str ? dst_reg1_str : "",
+                            dst_reg2_str ? "+" : "",
+                            dst_reg2_str ? dst_reg2_str : "",
+                            inst->src_data, dst_addr, dst_val, inst->src_data);
+                    }
+                    printf("%s", output);
+                    printf(" Clocks: +%d(%d +%dea%s) = %d ", (clocks+ea_clocks), clocks, ea_clocks, p_clocks_str, total_clocks);
                     break;
                 default:
                     ERROR("Unhandled src_type[%d]\n", inst->src_type);
@@ -319,6 +481,8 @@ void parse_add_inst(struct decoded_instruction_s *inst) {
 void parse_mov_inst(struct decoded_instruction_s *inst) {
     uint16_t dst_val;
     uint16_t value;
+    uint8_t clocks;
+    uint8_t ea_clocks;
 
     switch (inst->dst_type) {
         case TYPE_REGISTER:
@@ -327,6 +491,8 @@ void parse_mov_inst(struct decoded_instruction_s *inst) {
             switch (inst->src_type) {
                 case TYPE_REGISTER:
                     struct reg_definition_s src_reg = reg_item_map[inst->src_register];
+                    clocks = 2;
+                    total_clocks += clocks;
                     value = read_register(src_reg);
                     write_register(dst_reg, value);
                     printf("%s %s, %s \t\t; %s:0x%04x -> 0x%04x \t", inst->op_name,
@@ -334,6 +500,7 @@ void parse_mov_inst(struct decoded_instruction_s *inst) {
                         get_register_name(inst->src_register), 
                         get_register_name(inst->dst_register), 
                         dst_val, value);
+                    printf(" Clocks: +%d = %d ", clocks, total_clocks);
                     break;
                 case TYPE_SEGMENT_REGISTER:
                     value = segment_registers[inst->src_seg_register];
@@ -345,14 +512,20 @@ void parse_mov_inst(struct decoded_instruction_s *inst) {
                         dst_val, value);
                     break;
                 case TYPE_DATA:
+                    clocks = 4;
+                    total_clocks += clocks;
                     write_register(dst_reg, inst->src_data);
-                    printf("%s %s, %d \t\t; %s:0x%04x -> 0x%04x\t", inst->op_name, 
-                        get_register_name(inst->dst_register), 
-                        inst->src_data, 
-                        get_register_name(inst->dst_register), 
+                    printf("%s %s, %d \t\t; %s:0x%04x -> 0x%04x\t", inst->op_name,
+                        get_register_name(inst->dst_register),
+                        inst->src_data,
+                        get_register_name(inst->dst_register),
                         dst_val, inst->src_data&0xFFFF);
+                    printf(" Clocks: +%d = %d ", clocks, total_clocks);
                     break;
                 case TYPE_DIRECT_ADDRESS:
+                    clocks = 8;
+                    ea_clocks = get_ea_clocks(inst);
+                    total_clocks += clocks + ea_clocks;
                     value = memory[inst->src_direct_address];
                     write_register(dst_reg, value);
                     printf("%s %s, [%d] \t\t; %s:0x%04x -> 0x%04x\t", inst->op_name, 
@@ -360,9 +533,13 @@ void parse_mov_inst(struct decoded_instruction_s *inst) {
                         inst->src_direct_address, 
                         get_register_name(inst->dst_register), 
                         dst_val, value);
+                    printf(" Clocks: +%d(%d +%dea) = %d ", (clocks+ea_clocks), clocks, ea_clocks, total_clocks);
                     break;
                 case TYPE_EFFECTIVE_ADDRESS:
                     uint16_t src_addr = 0;
+                    clocks = 8;
+                    ea_clocks = get_ea_clocks(inst);
+                    total_clocks += clocks + ea_clocks;
                     const char *src_reg1_str = NULL;
                     const char *src_reg2_str = NULL;
                     char output[STR_BUFFER_SIZE] = {0};
@@ -385,9 +562,8 @@ void parse_mov_inst(struct decoded_instruction_s *inst) {
                             src_reg2_str ? src_reg2_str : "",
                             (inst->src_effective_displacement>0) ? "+" : "",
                             inst->src_effective_displacement);
-                        
                     } else {
-                        snprintf((char *)&output, STR_BUFFER_SIZE, "%s %s, [%s%s%s] \t; %s:0x%04x -> 0x%04x\t", inst->op_name,
+                        snprintf((char *)&output, STR_BUFFER_SIZE, "%s %s, [%s%s%s] \t\t; %s:0x%04x -> 0x%04x\t", inst->op_name,
                             get_register_name(inst->dst_register),
                             src_reg1_str ? src_reg1_str : "",
                             src_reg2_str ? "+" : "",
@@ -396,6 +572,7 @@ void parse_mov_inst(struct decoded_instruction_s *inst) {
                             dst_val, value);
                     }
                     printf("%s", output);
+                    printf(" Clocks: +%d(%d +%dea) = %d ", (clocks+ea_clocks), clocks, ea_clocks, total_clocks);
                     break;
                 default:
                     ERROR("Unhandled src_type[%d]\n", inst->src_type);
@@ -469,6 +646,9 @@ void parse_mov_inst(struct decoded_instruction_s *inst) {
             dst_addr += inst->dst_effective_displacement;
             switch (inst->src_type) {
                 case TYPE_REGISTER:
+                    clocks = 9;
+                    ea_clocks = get_ea_clocks(inst);
+                    total_clocks += clocks + ea_clocks;
                     value = read_register(reg_item_map[inst->src_register]);
                     dst_val = memory[dst_addr];
                     memory[dst_addr] = value;
@@ -493,6 +673,7 @@ void parse_mov_inst(struct decoded_instruction_s *inst) {
                             dst_addr, dst_val, value);
                     }
                     printf("%s", output);
+                    printf(" Clocks: +%d(%d +%dea) = %d ", (clocks+ea_clocks), clocks, ea_clocks, total_clocks);
                     break;
                 case TYPE_DATA:
                     dst_val = memory[dst_addr];
