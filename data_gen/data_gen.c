@@ -178,6 +178,9 @@ int main (int argc, char *argv[]) {
     printf("Using json_outfile       [%s]\n", json_outfile);
     printf("Using binary_outfile     [%s]\n", binary_outfile);
     printf("Using stats_outfile      [%s]\n", stats_outfile);
+    if (is_clustered) {
+        printf("Start cluster            [%3.16f][%3.16f]\n", cluster_x, cluster_y);
+    }
     printf("\n\n");
 
     json_fp = fopen(json_outfile, "w");
@@ -201,8 +204,9 @@ int main (int argc, char *argv[]) {
     fprintf(stats_fp, "Using json_outfile       [%s]\n", json_outfile);
     fprintf(stats_fp, "Using binary_outfile     [%s]\n", binary_outfile);
     fprintf(stats_fp, "Using stats_outfile      [%s]\n", stats_outfile);
-    fprintf(stats_fp, "Starting cluster_x       [%3.16f]\n", cluster_x);
-    fprintf(stats_fp, "Starting cluster_y       [%3.16f]\n", cluster_y);
+    if (is_clustered) {
+            fprintf(stats_fp, "Start cluster            [%3.16f][%3.16f]\n", cluster_x, cluster_y);
+    }
 
     /* start json structure */
     fprintf(json_fp, "{\"pairs\":[\n");
@@ -213,23 +217,21 @@ int main (int argc, char *argv[]) {
     bool first_line = true;
     int num_clusters = 1;
     uint64_t cluster_threshold = count / NUM_CLUSTERS;
-    printf("Start cluster            [%3.16f][%3.16f]\n", cluster_x, cluster_y);
 
     for (uint64_t i=0; i<count; i++) {
         double X0, Y0, X1, Y1;
         double H_DIST;
-
-        if ( i == cluster_threshold) {
-            // generate new cluster origin
-            cluster_x = get_random_data(X_RADIUS);
-            cluster_y = get_random_data(Y_RADIUS);
-            fprintf(stats_fp,"New cluster              [%3.16f][%3.16f]\n", cluster_x, cluster_y);
-            printf("New cluster              [%3.16f][%3.16f]\n", cluster_x, cluster_y);
-            num_clusters++;
-            cluster_threshold += count / NUM_CLUSTERS;
-        }
-        
+       
         if (is_clustered) {
+            if ( i == cluster_threshold) {
+                // generate new cluster origin
+                cluster_x = get_random_data(X_RADIUS);
+                cluster_y = get_random_data(Y_RADIUS);
+                fprintf(stats_fp,"New cluster              [%3.16f][%3.16f]\n", cluster_x, cluster_y);
+                printf("New cluster              [%3.16f][%3.16f]\n", cluster_x, cluster_y);
+                num_clusters++;
+                cluster_threshold += count / NUM_CLUSTERS;
+            }
             X0 = cluster_x + get_random_data(X_RADIUS/4);
             Y0 = cluster_y + get_random_data(Y_RADIUS/4);
             X1 = cluster_x + get_random_data(X_RADIUS/4);
@@ -261,14 +263,16 @@ int main (int argc, char *argv[]) {
     fprintf(json_fp, "\n]}\n");
 
     printf("\n\n");
-    printf("num_clusters             [%d]\n", num_clusters);
+    if (is_clustered) {
+        printf("num_clusters             [%d]\n", num_clusters);
+        fprintf(stats_fp, "num_clusters             [%d]\n", num_clusters);
+    }
     printf("pos_min                  %3.16f\n", pos_min);
     printf("pos_max                  %3.16f\n", pos_max);
     printf("neg_min                  %3.16f\n", neg_min);
     printf("neg_max                  %3.16f\n", neg_max);
     printf("\n\n");
     
-    fprintf(stats_fp, "num_clusters             [%d]\n", num_clusters);
     fprintf(stats_fp, "pos_min                  %3.16f\n", pos_min);
     fprintf(stats_fp, "pos_max                  %3.16f\n", pos_max);
     fprintf(stats_fp, "neg_min                  %3.16f\n", neg_min);
