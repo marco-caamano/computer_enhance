@@ -15,17 +15,31 @@
         exit(1);                        \
     }
 
+#define LOG(...) {                  \
+        if (verbose) {              \
+            printf(__VA_ARGS__);    \
+        }                           \
+    }
+
 #define APPROX_EARTH_RADIUS     6372.8
 #define MAX_ITEM_NAME_LEN       8
 #define MAX_VALUE_LEN           64
 
+#define FOUND_X0                0x1
+#define FOUND_Y0                0x2
+#define FOUND_X1                0x4
+#define FOUND_Y1                0x8
+
+
 char item_name_buffer[MAX_ITEM_NAME_LEN] = {};
 char item_value_buffer[MAX_VALUE_LEN] = {};
+bool verbose = false;
 
 void usage(void) {
     fprintf(stderr, "Data Generator Binary Reader:\n");
     fprintf(stderr, "-h            This help dialog.\n");
     fprintf(stderr, "-i <bin_file> Path to binary file.\n");
+    fprintf(stderr, "-v            Enable Verbose Output.\n");
 }
 
 /*
@@ -51,37 +65,42 @@ void usage(void) {
  * so this is not really a good way to validate the structure is actually real json
  */
 
-void advance_until(FILE *fp, char target) {
+bool advance_until(FILE *fp, char target) {
     char read_data;
     int ret;
     uint64_t count = 0;
-    while(1) {
+    while(feof(fp)==0) {
         ret = fread(&read_data, sizeof(char), 1, fp);
         if (ret == 0) {
-            ERROR("Ran out file contents searching for [%c]\n", target);
+            LOG("Ran out file contents searching for [%c] feof[%d]\n", target, feof(fp));
         }
         count++;
         if (read_data==target) {
             // found target and we have already consumed
-            printf("Found [%c] after [%lu] bytes read\n", target, count);
-            return;
+            LOG("Found [%c] after [%lu] bytes read\n", target, count);
+            return true;
         }
     }
+    return false;
 }
 
-void find_string(FILE *fp, char *string) {
+bool find_string(FILE *fp, char *string) {
+    bool found_it = false;
     int len = strlen(string);
-    printf("Looking for [%s] len[%d]\n", string, len);
+    LOG("Looking for [%s] len[%d]\n", string, len);
     char *ptr = string;
     for (int i=0; i<len; i++) {
-        advance_until(fp, *ptr);
+        found_it = advance_until(fp, *ptr);
+        if (!found_it) return false;
         ptr++;
     }
+    // we found all elements
+    return true;
 }
 
 // similar to advance_until but it will extract the consumed chars to a
 // given buffer, without the last target char
-void extract_until(FILE *fp, char* buffer, int max_buffer_len, char *target) {
+bool extract_until(FILE *fp, char* buffer, int max_buffer_len, char *target) {
     char read_data;
     int ret;
     uint64_t count = 0;
@@ -96,30 +115,31 @@ void extract_until(FILE *fp, char* buffer, int max_buffer_len, char *target) {
         count++;
         if (read_data==*target) {
             // found target and we have already consumed
-            printf("Found [%c] after [%lu] bytes read buffer[%s]\n", *target, count, buffer);
-            return;
+            LOG("Found [%c] after [%lu] bytes read buffer[%s]\n", *target, count, buffer);
+            return true;
         } else {
             if (count>max_buffer_len) {
                 ERROR("Overran the target buffer\n");
+                break;
             }
             // copy read char to buffer
             *ptr = read_data;
             ptr++;
         }
     }
+    return false;
 }
 
 
 int main (int argc, char *argv[]) {
     int opt;
+    bool found_it;
     char *input_file = NULL;
     FILE *json_fp = NULL;
-    // uint64_t count = 0;
-    // int ret;
-    // uint64_t binary_write_count = 0;
-    // double X0, Y0, X1, Y1 = 0;
-    // double H_DIST, H_DIST_CALC, sum = 0;
-    // double delta = 0;
+    int ret;
+    double X0, Y0, X1, Y1 = 0;
+    double H_DIST, sum, average = 0;
+    uint64_t count_values = 0;
 
     while( (opt = getopt(argc, argv, "hi:")) != -1) {
         switch (opt) {
@@ -130,6 +150,10 @@ int main (int argc, char *argv[]) {
             
             case 'i':
                 input_file = strdup(optarg);
+                break;
+
+            case 'v':
+                verbose = true;
                 break;
 
             default:
@@ -154,55 +178,117 @@ int main (int argc, char *argv[]) {
 
     json_fp = fopen(input_file, "r");
     if (!json_fp) {
-        ERROR("Failed to open binary file [%d][%s]\n", errno, strerror(errno));
+        ERROR("Failed to open file [%d][%s]\n", errno, strerror(errno));
     }
 
+    printf("Start reading File\n");
+    printf("------------------\n");
+
     // first hit the start of json
-    advance_until(json_fp, '{');
+    found_it = advance_until(json_fp, '{');
+    if (!found_it) ERROR("Failed to find start of json\n");
 
     // there may be other json items, we want to find "pairs"
-    find_string(json_fp, "\"pairs\"");
-    advance_until(json_fp, ':');
-    advance_until(json_fp, '[');    // start of json array
+    found_it = find_string(json_fp, "\"pairs\"");
+    if (!found_it) ERROR("Failed to find pairs item\n");
+    found_it = advance_until(json_fp, ':');
+    if (!found_it) ERROR("Failed to find item separator\n");
+    found_it = advance_until(json_fp, '[');    // start of json array
+    if (!found_it) ERROR("Failed to find start of json array\n");
 
-    advance_until(json_fp, '{');    // start of item
-    
-    advance_until(json_fp, '"');    // Start of item id
-    // next we have the id of a value, can be x0, y0, x1, y1 and then the end '"' if the id
-    // extract into item_name_buffer until we find the end of the identifier
-    extract_until(json_fp, item_name_buffer, MAX_ITEM_NAME_LEN, "\"");
+    while(feof(json_fp)==0) {
+        uint8_t found_item = 0;
+        uint8_t item_count = 0;
+        double value;
+        bool found_x0;
+        bool found_y0;
+        bool found_x1;
+        bool found_y1;
+
+        // parse array row
+        found_it = advance_until(json_fp, '{');    // start of row item
+        if (!found_it) break;
+
+        while (item_count<4) {
+            found_it = advance_until(json_fp, '"');    // Start of item id
+            if (!found_it) break;
+            // next we have the id of a value, can be x0, y0, x1, y1 and then the end '"' if the id
+            // extract into item_name_buffer until we find the end of the identifier
+            extract_until(json_fp, item_name_buffer, MAX_ITEM_NAME_LEN, "\"");
+
+            if (strncmp("x0",item_name_buffer,MAX_ITEM_NAME_LEN)==0) {
+                found_item = FOUND_X0;
+            } else if (strncmp("y0",item_name_buffer,MAX_ITEM_NAME_LEN)==0) {
+                found_item = FOUND_Y0;
+            } else if (strncmp("x1",item_name_buffer,MAX_ITEM_NAME_LEN)==0) {
+                found_item = FOUND_X1;
+            } else if (strncmp("y1",item_name_buffer,MAX_ITEM_NAME_LEN)==0) {
+                found_item = FOUND_Y1;
+            } else {
+                ERROR("Failed to identify item[%s]\n", item_name_buffer);
+            }
+            found_it = advance_until(json_fp, ':');    // start of value
+            if (!found_it) break;
+
+            if (item_count<3) {
+                // first 3 values end with ','
+                extract_until(json_fp, item_value_buffer, MAX_VALUE_LEN, ",");
+            } else {
+                // the last item does not end with ',' instead we hit the end of the array item '}'
+                extract_until(json_fp, item_value_buffer, MAX_VALUE_LEN, "}");
+            }
+            
+            ret = sscanf((char *)&item_value_buffer, "%lf", &value);
+            if (ret!=1) {
+                ERROR("Failed to parse value from [%s]\n", item_value_buffer);
+            }
+            LOG("Found value [%3.16f]\n", value);
+            switch (found_item) {
+                case FOUND_X0:
+                    X0 = value;
+                    found_x0 = true;
+                    break;
+                case FOUND_Y0:
+                    Y0 = value;
+                    found_y0 = true;
+                    break;
+                case FOUND_X1:
+                    X1 = value;
+                    found_x1 = true;
+                    break;
+                case FOUND_Y1:
+                    Y1 = value;
+                    found_y1 = true;
+                    break;
+                default:
+                    ERROR("Invalid found_item[%d]\n", found_item);
+                    break;
+            }
+            item_count++;
+        }
+
+        if (!found_x0 || !found_y0 || !found_x1 || !found_y1) {
+            ERROR("Invalid row format, failed to find all items\n");
+        }
+        H_DIST = ReferenceHaversine(X0, Y0, X1, Y1, APPROX_EARTH_RADIUS);
+
+        sum += H_DIST;
+        count_values++;
+
+        LOG("x0:%3.16f, y0:%3.16f, x1:%3.16f, y1:%3.16f | h_dist:%3.16f \n", X0, Y0, X1, Y1, H_DIST);
+    }
 
 
-    // while (1) {
-    //     ret = fread(&X0, sizeof(double), 1, json_fp);
-    //     if (ret!=1) break;
-    //     ret = fread(&Y0, sizeof(double), 1, json_fp);
-    //     if (ret!=1) break;
-    //     ret = fread(&X1, sizeof(double), 1, json_fp);
-    //     if (ret!=1) break;
-    //     ret = fread(&Y1, sizeof(double), 1, json_fp);
-    //     if (ret!=1) break;
-    //     ret = fread(&H_DIST, sizeof(double), 1, json_fp);
-    //     if (ret!=1) break;
-    //     H_DIST_CALC = ReferenceHaversine(X0, Y0, X1, Y1, APPROX_EARTH_RADIUS);
-    //     delta = H_DIST - H_DIST_CALC;
-    //     // printf("x0:%3.16f, y0:%3.16f, x1:%3.16f, y1:%3.16f | h_dist:%3.16f | h_dist_calc:%3.16f | delta:%3.16f\n", X0, Y0, X1, Y1, H_DIST, H_DIST_CALC, delta);
-    //     if (delta!=0) {
-    //         ERROR("Delta[%3.16f] for a row[%lu] is not zero\n", delta, count);
-    //     }
-    //     sum += H_DIST_CALC;
-    //     binary_write_count += 5;
-    //     count++;
-    // }
+    if (feof(json_fp)==1) {
+        printf("-------------------\n");
+        printf("Reached End of File\n\n");
+    }
 
-    // printf("All read values match expected Haversine Distance\n\n");
+    average = sum/count_values;
 
-   
-    // double average = sum/count;
-    // printf("binary_write_count     %lu\n", binary_write_count);
-    // printf("binary_bytes_writen    %lu\n", binary_write_count*sizeof(double));
-    // printf("sum H_DIST_CALC        %3.16f\n", sum);
-    // printf("average H_DIST_CALC    %3.16f\n\n", average);
+    printf("Count                 %lu items\n", count_values);
+    printf("sum H_DIST            %3.16f\n", sum);
+    printf("average H_DIST        %3.16f\n\n", average);
 
 
     fclose(json_fp);
