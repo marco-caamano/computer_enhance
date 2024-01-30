@@ -26,6 +26,26 @@
 #define Y_RADIUS                90
 #define APPROX_EARTH_RADIUS     6372.8
 
+/*
+ * Attempting to avoid a very constant haversine average sum when the 
+ * count is really high like 10million entries by addring a clustering
+ * approach to the data. Circle thru NUM_CLUSTERS clusters where we pick
+ * a random cluster origin and then generate the random points out from a
+ * 1/4 radious. Right now the cluster origins are random themselves but
+ * we may achieve some better results by picking the origins from sphere
+ * sectors. But so far this seems good enough for what we want:
+ * 
+ * marco@CharAznable:~/caamao_computer_enhance/data_gen$ grep "average H_DIST" test_data*.txt
+ * test_data_seed_47651_count_10000000_timestamp_20240130.txt:average H_DIST           2682.0908927860473341
+ * test_data_seed_728_count_10000000_timestamp_20240130.txt:average H_DIST             2566.2521957280346214
+ * test_data_seed_98982323_count_10000000_timestamp_20240130.txt:average H_DIST        3026.3891002102654966 
+ * 
+ * the average H_DIST sum is not getting to the 10K number of the uniform distribution
+ */
+#define NUM_CLUSTERS            4
+
+
+
 double pos_min = 0;
 double pos_max = 0;
 double neg_min = 0;
@@ -61,6 +81,7 @@ double get_random_data(double radius) {
 
 void usage(void) {
     fprintf(stderr, "Data Generator Usage:\n");
+    fprintf(stderr, "-c         Use a clustered distribution (default is uniform distribution).\n");
     fprintf(stderr, "-h         This help dialog.\n");
     fprintf(stderr, "-n <count> Generate count data points.\n");
     fprintf(stderr, "-s <seed>  Set the Seed.\n");
@@ -73,6 +94,7 @@ int main (int argc, char *argv[]) {
     char binary_outfile[MAX_FILENAME_LEN] = {};
     char stats_outfile[MAX_FILENAME_LEN] = {};
     char timestamp[MAX_TIMESTAMP_LEN] = {};
+    bool is_clustered = false;
     FILE *json_fp = NULL;
     FILE *binary_fp = NULL;
     FILE *stats_fp = NULL;
@@ -82,14 +104,20 @@ int main (int argc, char *argv[]) {
     struct tm *timeptr;
     int ret;
     uint64_t binary_write_count = 0;
+    double cluster_x = 0;
+    double cluster_y = 0;
 
-    while( (opt = getopt(argc, argv, "hn:s:")) != -1) {
+    while( (opt = getopt(argc, argv, "chn:s:")) != -1) {
         switch (opt) {
+            case 'c':
+                is_clustered = true;
+                break;
+
             case 'h':
                 usage();
                 exit(0);
                 break;
-            
+
             case 'n':
                 count = strtoull(optarg, NULL, 0);
                 break;
@@ -127,21 +155,22 @@ int main (int argc, char *argv[]) {
        ERROR("Timestamp overflow\n");
     }
 
-    ret = snprintf((char *)&json_outfile, MAX_FILENAME_LEN, "datagen_seed_%u_count_%lu_timestamp_%s.json", seed, count, timestamp);
+    ret = snprintf((char *)&json_outfile, MAX_FILENAME_LEN, "test_data_seed_%u_count_%lu_timestamp_%s.json", seed, count, timestamp);
     if (ret>=MAX_FILENAME_LEN) {
        ERROR("Json filename overflow\n");
     }
 
-    ret = snprintf((char *)&binary_outfile, MAX_FILENAME_LEN, "datagen_seed_%u_count_%lu_timestamp_%s.bin", seed, count, timestamp);
+    ret = snprintf((char *)&binary_outfile, MAX_FILENAME_LEN, "test_data_seed_%u_count_%lu_timestamp_%s.bin", seed, count, timestamp);
     if (ret>=MAX_FILENAME_LEN) {
        ERROR("Json filename overflow\n");
     }
 
-    ret = snprintf((char *)&stats_outfile, MAX_FILENAME_LEN, "datagen_seed_%u_count_%lu_timestamp_%s.txt", seed, count, timestamp);
+    ret = snprintf((char *)&stats_outfile, MAX_FILENAME_LEN, "test_data_seed_%u_count_%lu_timestamp_%s.txt", seed, count, timestamp);
     if (ret>=MAX_FILENAME_LEN) {
        ERROR("Json filename overflow\n");
     }
 
+    printf("Distribution             [%s]\n", is_clustered ? "Clustered" : "Uniform");
     printf("Using Count              [%lu]\n", count);
     printf("Using Seed               [%u]\n", seed);
     printf("Using RAND_MAX           [%u]\n", RAND_MAX);
@@ -164,6 +193,17 @@ int main (int argc, char *argv[]) {
         ERROR("Failed to open stats file [%d][%s]\n", errno, strerror(errno));
     }
 
+    fprintf(stats_fp, "Distribution             [%s]\n", is_clustered ? "Clustered" : "Uniform");
+    fprintf(stats_fp, "Using Count              [%lu]\n", count);
+    fprintf(stats_fp, "Using Seed               [%u]\n", seed);
+    fprintf(stats_fp, "Using RAND_MAX           [%u]\n", RAND_MAX);
+    fprintf(stats_fp, "Using timestamp          [%s]\n", timestamp);
+    fprintf(stats_fp, "Using json_outfile       [%s]\n", json_outfile);
+    fprintf(stats_fp, "Using binary_outfile     [%s]\n", binary_outfile);
+    fprintf(stats_fp, "Using stats_outfile      [%s]\n", stats_outfile);
+    fprintf(stats_fp, "Starting cluster_x       [%3.16f]\n", cluster_x);
+    fprintf(stats_fp, "Starting cluster_y       [%3.16f]\n", cluster_y);
+
     /* start json structure */
     fprintf(json_fp, "{\"pairs\":[\n");
 
@@ -171,13 +211,35 @@ int main (int argc, char *argv[]) {
 
     double sum = 0;
     bool first_line = true;
+    int num_clusters = 1;
+    uint64_t cluster_threshold = count / NUM_CLUSTERS;
+    printf("Start cluster            [%3.16f][%3.16f]\n", cluster_x, cluster_y);
+
     for (uint64_t i=0; i<count; i++) {
         double X0, Y0, X1, Y1;
         double H_DIST;
-        X0 = get_random_data(X_RADIUS);
-        Y0 = get_random_data(Y_RADIUS);
-        X1 = get_random_data(X_RADIUS);
-        Y1 = get_random_data(Y_RADIUS);
+
+        if ( i == cluster_threshold) {
+            // generate new cluster origin
+            cluster_x = get_random_data(X_RADIUS);
+            cluster_y = get_random_data(Y_RADIUS);
+            fprintf(stats_fp,"New cluster              [%3.16f][%3.16f]\n", cluster_x, cluster_y);
+            printf("New cluster              [%3.16f][%3.16f]\n", cluster_x, cluster_y);
+            num_clusters++;
+            cluster_threshold += count / NUM_CLUSTERS;
+        }
+        
+        if (is_clustered) {
+            X0 = cluster_x + get_random_data(X_RADIUS/4);
+            Y0 = cluster_y + get_random_data(Y_RADIUS/4);
+            X1 = cluster_x + get_random_data(X_RADIUS/4);
+            Y1 = cluster_y + get_random_data(Y_RADIUS/4);
+        } else {
+            X0 = get_random_data(X_RADIUS);
+            Y0 = get_random_data(Y_RADIUS);
+            X1 = get_random_data(X_RADIUS);
+            Y1 = get_random_data(Y_RADIUS);
+        }
         H_DIST = ReferenceHaversine(X0, Y0, X1, Y1, APPROX_EARTH_RADIUS);
         sum += H_DIST;
 
@@ -199,16 +261,18 @@ int main (int argc, char *argv[]) {
     fprintf(json_fp, "\n]}\n");
 
     printf("\n\n");
-    printf("pos_min     %3.16f\n", pos_min);
-    printf("pos_max     %3.16f\n", pos_max);
-    printf("neg_min     %3.16f\n", neg_min);
-    printf("neg_max     %3.16f\n", neg_max);
+    printf("num_clusters             [%d]\n", num_clusters);
+    printf("pos_min                  %3.16f\n", pos_min);
+    printf("pos_max                  %3.16f\n", pos_max);
+    printf("neg_min                  %3.16f\n", neg_min);
+    printf("neg_max                  %3.16f\n", neg_max);
     printf("\n\n");
-
-    fprintf(stats_fp,"pos_min     %3.16f\n", pos_min);
-    fprintf(stats_fp,"pos_max     %3.16f\n", pos_max);
-    fprintf(stats_fp,"neg_min     %3.16f\n", neg_min);
-    fprintf(stats_fp,"neg_max     %3.16f\n", neg_max);
+    
+    fprintf(stats_fp, "num_clusters             [%d]\n", num_clusters);
+    fprintf(stats_fp, "pos_min                  %3.16f\n", pos_min);
+    fprintf(stats_fp, "pos_max                  %3.16f\n", pos_max);
+    fprintf(stats_fp, "neg_min                  %3.16f\n", neg_min);
+    fprintf(stats_fp, "neg_max                  %3.16f\n", neg_max);
 
     
     double average = sum/count;
@@ -216,10 +280,11 @@ int main (int argc, char *argv[]) {
     printf("binary_bytes_writen    %lu\n", binary_write_count*sizeof(double));
     printf("sum H_DIST             %3.16f\n", sum);
     printf("average H_DIST         %3.16f\n\n", average);
-    fprintf(stats_fp,"binary_write_count     %lu\n", binary_write_count);
-    fprintf(stats_fp,"binary_bytes_writen    %lu\n", binary_write_count*sizeof(double));
-    fprintf(stats_fp, "sum H_DIST            %3.16f\n", sum);
-    fprintf(stats_fp, "average H_DIST        %3.16f\n\n", average);
+
+    fprintf(stats_fp, "binary_write_count       %lu\n", binary_write_count);
+    fprintf(stats_fp, "binary_bytes_writen      %lu\n", binary_write_count*sizeof(double));
+    fprintf(stats_fp, "sum H_DIST               %3.16f\n", sum);
+    fprintf(stats_fp, "average H_DIST           %3.16f\n\n", average);
 
 
     fclose(json_fp);
