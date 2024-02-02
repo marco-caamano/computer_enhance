@@ -6,6 +6,10 @@
 #include <getopt.h>
 #include <unistd.h>
 #include <errno.h>
+#include <math.h>
+#define __USE_UNIX98
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include "haversine.h"
 
@@ -25,22 +29,47 @@
 #define MAX_ITEM_NAME_LEN       8
 #define MAX_VALUE_LEN           64
 
+#define JSON_OVERHEAD_SIZE      14
+#define JSON_MAX_ROW_SIZE       111 // with trailing coma
+#define JSON_MIN_ROW_SIZE       101 // with trailing coma
+
 #define FOUND_X0                0x1
 #define FOUND_Y0                0x2
 #define FOUND_X1                0x4
 #define FOUND_Y1                0x8
 
+/*
+ * We will support several parsing JSON options:
+ * - put all items in a linked list (will malloc for each item)
+ * - estimate the max items and preallocated the required memmory
+ *   to store them all and avoid all the small malloc and linked
+ *   list overhead
+ */
+struct data_item_s {
+    double x0;
+    double y0;
+    double x1;
+    double y1;
+};
+
+struct list_item_s {
+    struct data_item_s data_item;
+    struct list_item_s *next_item;
+};
+
+// when using linked list
+struct list_item_s *list_head = NULL;
+struct list_item_s *list_tail = NULL;
+
+// when using preallocated memory array
+struct data_item_s *data_array = NULL;
+
+// how many data items were used
+size_t data_item_count = 0;
 
 char item_name_buffer[MAX_ITEM_NAME_LEN] = {};
 char item_value_buffer[MAX_VALUE_LEN] = {};
 bool verbose = false;
-
-void usage(void) {
-    fprintf(stderr, "Data Generator Binary Reader:\n");
-    fprintf(stderr, "-h            This help dialog.\n");
-    fprintf(stderr, "-i <bin_file> Path to binary file.\n");
-    fprintf(stderr, "-v            Enable Verbose Output.\n");
-}
 
 /*
  * There is no clear guidance on how conformant this json parser should be
@@ -130,59 +159,10 @@ bool extract_until(FILE *fp, char* buffer, int max_buffer_len, char *target) {
     return false;
 }
 
-
-int main (int argc, char *argv[]) {
-    int opt;
-    bool found_it;
-    char *input_file = NULL;
-    FILE *json_fp = NULL;
-    int ret;
+void parse_file(FILE *json_fp, bool preallocate_entries) {
     double X0, Y0, X1, Y1 = 0;
-    double H_DIST, sum, average = 0;
-    uint64_t count_values = 0;
-
-    while( (opt = getopt(argc, argv, "hi:")) != -1) {
-        switch (opt) {
-            case 'h':
-                usage();
-                exit(0);
-                break;
-            
-            case 'i':
-                input_file = strdup(optarg);
-                break;
-
-            case 'v':
-                verbose = true;
-                break;
-
-            default:
-                fprintf(stderr, "ERROR Invalid command line option\n");
-                usage();
-                exit(1);
-                break;
-        }
-    }
-
-    if (!input_file) {
-        usage();
-        exit(1);
-    }
-
-    printf("================\n");
-    printf("JSON Data Parser\n");
-    printf("================\n");
-
-    printf("Using input_file              [%s]\n", input_file);
-    printf("\n\n");
-
-    json_fp = fopen(input_file, "r");
-    if (!json_fp) {
-        ERROR("Failed to open file [%d][%s]\n", errno, strerror(errno));
-    }
-
-    printf("Start reading File\n");
-    printf("------------------\n");
+    bool found_it;
+    int ret;
 
     // first hit the start of json
     found_it = advance_until(json_fp, '{');
@@ -270,25 +250,155 @@ int main (int argc, char *argv[]) {
         if (!found_x0 || !found_y0 || !found_x1 || !found_y1) {
             ERROR("Invalid row format, failed to find all items\n");
         }
-        H_DIST = ReferenceHaversine(X0, Y0, X1, Y1, APPROX_EARTH_RADIUS);
+        LOG("Parsed x0:%3.16f, y0:%3.16f, x1:%3.16f, y1:%3.16f \n", X0, Y0, X1, Y1);
 
-        sum += H_DIST;
-        count_values++;
+        if (preallocate_entries) {
+            // use preallocated array
+            struct data_item_s *item = &data_array[data_item_count];
+            item->x0 = X0;
+            item->y0 = Y0;
+            item->x1 = X1;
+            item->y1 = Y1;
+        } else {
+            // use linked list
+            struct list_item_s *item = malloc(sizeof(struct list_item_s));
+            if (!item) {
+                ERROR("Failed to allocate [%lu]bytes for item", sizeof(struct list_item_s));
+            }
+            item->data_item.x0 = X0;
+            item->data_item.y0 = Y0;
+            item->data_item.x1 = X1;
+            item->data_item.y1 = Y1;
+            item->next_item = NULL;
+            // add to linked list
+            if (!list_head) {
+                // first item, it is both head and tail
+                list_head = item;
+                list_tail = item;
+            } else {
+                // there are already items in the list
+                // append to the tail
+                list_tail->next_item = item;
+                list_tail = item;
+            }
+        }
+        data_item_count++;
+    }
+    LOG("Total Parsed data items [%lu]\n", data_item_count);
+}
 
-        LOG("x0:%3.16f, y0:%3.16f, x1:%3.16f, y1:%3.16f | h_dist:%3.16f \n", X0, Y0, X1, Y1, H_DIST);
+/*
+ * This will give us an estimate on how many data entries are in the file without
+ * parsing it. This will always be off as we target the max case were all lines are
+ * as small as possible, so the real item count will be lower than this, but this
+ * gives us a ballpark figure
+ */
+size_t estimate_total_entries(off_t filesize) {
+    size_t data_bytes = filesize - JSON_OVERHEAD_SIZE;
+    size_t estimated_max_items = ceil((float)((float)data_bytes / (float)JSON_MIN_ROW_SIZE));
+    return estimated_max_items;
+}
+
+void usage(void) {
+    fprintf(stderr, "Data Generator Binary Reader:\n");
+    fprintf(stderr, "-h            This help dialog.\n");
+    fprintf(stderr, "-i <bin_file> Path to binary file.\n");
+    fprintf(stderr, "-p            Estimate Max Item count and preallocate a memory for all items,\n");
+    fprintf(stderr, "              default is to malloc each item and use a linked list.\n");
+    fprintf(stderr, "-v            Enable Verbose Output.\n");
+}
+
+int main (int argc, char *argv[]) {
+    int opt;
+    bool preallocate_entries = false;
+    char *input_file = NULL;
+    FILE *json_fp = NULL;
+    int ret;
+    
+    // double H_DIST, sum, average = 0;
+    // uint64_t count_values = 0;
+    struct stat statbuf = {};
+
+    while( (opt = getopt(argc, argv, "hi:")) != -1) {
+        switch (opt) {
+            case 'h':
+                usage();
+                exit(0);
+                break;
+            
+            case 'i':
+                input_file = strdup(optarg);
+                break;
+            
+            case 'p':
+                preallocate_entries = true;
+                break;
+
+            case 'v':
+                verbose = true;
+                break;
+
+            default:
+                fprintf(stderr, "ERROR Invalid command line option\n");
+                usage();
+                exit(1);
+                break;
+        }
     }
 
+    if (!input_file) {
+        usage();
+        exit(1);
+    }
+
+    printf("================\n");
+    printf("JSON Data Parser\n");
+    printf("================\n");
+
+    printf("Using input_file              [%s]\n", input_file);
+    ret = stat(input_file, &statbuf);
+    if (ret != 0) {
+        ERROR("Unable to get filestats[%d][%s]\n", errno, strerror(errno));
+    }
+    printf("Using input_file              [%s]\n", input_file);
+    printf("PreAllocating entries         [%s]\n", preallocate_entries ? "True" : "False");
+    printf("  File Size                   [%lu] bytes\n", statbuf.st_size);
+    printf("  IO Block Size               [%lu] bytes\n", statbuf.st_blksize);
+    printf("  Allocated 512B Blocks       [%lu]\n", statbuf.st_blocks);
+    size_t item_estimate = estimate_total_entries(statbuf.st_size);
+    printf("  Estimated Items             [%lu]\n", item_estimate);
+    printf("\n\n");
+
+    json_fp = fopen(input_file, "r");
+    if (!json_fp) {
+        ERROR("Failed to open file [%d][%s]\n", errno, strerror(errno));
+    }
+
+    printf("Start Parsing File\n");
+    printf("------------------\n");
+
+    parse_file(json_fp, preallocate_entries);
 
     if (feof(json_fp)==1) {
         printf("-------------------\n");
         printf("Reached End of File\n\n");
     }
 
-    average = sum/count_values;
+    // calculate haversine of all data items
+        //     H_DIST = ReferenceHaversine(X0, Y0, X1, Y1, APPROX_EARTH_RADIUS);
 
-    printf("Count                 %lu items\n", count_values);
-    printf("sum H_DIST            %3.16f\n", sum);
-    printf("average H_DIST        %3.16f\n\n", average);
+        // sum += H_DIST;
+        // count_values++;
+
+        // LOG("x0:%3.16f, y0:%3.16f, x1:%3.16f, y1:%3.16f | h_dist:%3.16f \n", X0, Y0, X1, Y1, H_DIST);
+
+
+
+    // average = sum/count_values;
+
+    // printf("Count                 %lu items\n", count_values);
+    // printf("sum H_DIST            %3.16f\n", sum);
+    // printf("average H_DIST        %3.16f\n\n", average);
 
 
     fclose(json_fp);
