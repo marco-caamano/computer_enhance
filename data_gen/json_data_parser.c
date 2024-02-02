@@ -287,6 +287,55 @@ void parse_file(FILE *json_fp, bool preallocate_entries) {
     LOG("Total Parsed data items [%lu]\n", data_item_count);
 }
 
+void calculate_haversine_average(bool preallocate_entries) {
+    double H_DIST, sum, average = 0;
+    uint64_t count_values = 0;
+
+    if (preallocate_entries) {
+        // use preallocated array
+        for (size_t i=0; i<data_item_count; i++) {
+            struct data_item_s *item = &data_array[i];
+            H_DIST = ReferenceHaversine(item->x0, item->y0,
+                                        item->x1, item->y1,
+                                        APPROX_EARTH_RADIUS);
+            LOG("x0:%3.16f, y0:%3.16f, x1:%3.16f, y1:%3.16f | h_dist:%3.16f \n", 
+                item->x0, item->y0, item->x1, item->y1, H_DIST);
+
+            sum += H_DIST;
+            count_values++;
+        }
+    } else {
+        // sanity check
+        if (!list_head || !list_tail) {
+            ERROR("Sanity check failed for linked list");
+        }
+        // use linked list
+        struct list_item_s *item = list_head;
+        while (item) {
+            H_DIST = ReferenceHaversine(item->data_item.x0, item->data_item.y0,
+                                        item->data_item.x1, item->data_item.y1,
+                                        APPROX_EARTH_RADIUS);
+            LOG("x0:%3.16f, y0:%3.16f, x1:%3.16f, y1:%3.16f | h_dist:%3.16f \n", 
+                item->data_item.x0,
+                item->data_item.y0,
+                item->data_item.x1,
+                item->data_item.y1,
+                H_DIST);
+
+            sum += H_DIST;
+            count_values++;
+
+            // move to next item
+            item = item->next_item;
+        }
+    }
+    average = sum/count_values;
+
+    printf("Count                 %lu items\n", count_values);
+    printf("sum H_DIST            %3.16f\n", sum);
+    printf("average H_DIST        %3.16f\n\n", average);
+}
+
 /*
  * This will give us an estimate on how many data entries are in the file without
  * parsing it. This will always be off as we target the max case were all lines are
@@ -314,9 +363,6 @@ int main (int argc, char *argv[]) {
     char *input_file = NULL;
     FILE *json_fp = NULL;
     int ret;
-    
-    // double H_DIST, sum, average = 0;
-    // uint64_t count_values = 0;
     struct stat statbuf = {};
 
     while( (opt = getopt(argc, argv, "hi:")) != -1) {
@@ -369,6 +415,13 @@ int main (int argc, char *argv[]) {
     printf("  Estimated Items             [%lu]\n", item_estimate);
     printf("\n\n");
 
+    if (preallocate_entries) {
+        data_array = malloc(item_estimate * sizeof(struct data_item_s));
+        if (!data_array) {
+            ERROR("Failed to malloc [%lu]bytes for data array\n", item_estimate * sizeof(struct data_item_s));
+        }
+    }
+
     json_fp = fopen(input_file, "r");
     if (!json_fp) {
         ERROR("Failed to open file [%d][%s]\n", errno, strerror(errno));
@@ -384,24 +437,14 @@ int main (int argc, char *argv[]) {
         printf("Reached End of File\n\n");
     }
 
-    // calculate haversine of all data items
-        //     H_DIST = ReferenceHaversine(X0, Y0, X1, Y1, APPROX_EARTH_RADIUS);
-
-        // sum += H_DIST;
-        // count_values++;
-
-        // LOG("x0:%3.16f, y0:%3.16f, x1:%3.16f, y1:%3.16f | h_dist:%3.16f \n", X0, Y0, X1, Y1, H_DIST);
-
-
-
-    // average = sum/count_values;
-
-    // printf("Count                 %lu items\n", count_values);
-    // printf("sum H_DIST            %3.16f\n", sum);
-    // printf("average H_DIST        %3.16f\n\n", average);
-
-
     fclose(json_fp);
+
+    calculate_haversine_average(preallocate_entries);
+
+    printf("\n\n");
+    printf("=============================\n");
+    printf("JSON Data Parser Completed OK\n");
+    printf("=============================\n");
 
     return 0;
 }
