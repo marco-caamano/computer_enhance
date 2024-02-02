@@ -365,7 +365,7 @@ int main (int argc, char *argv[]) {
     int ret;
     struct stat statbuf = {};
 
-    while( (opt = getopt(argc, argv, "hi:")) != -1) {
+    while( (opt = getopt(argc, argv, "hi:p")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
