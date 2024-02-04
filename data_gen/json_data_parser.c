@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 
 #include "haversine.h"
+#include "rdtsc_utils.h"
 
 #define ERROR(...) {                    \
         fprintf(stderr, "[%d]", __LINE__);      \
@@ -364,6 +365,7 @@ int main (int argc, char *argv[]) {
     FILE *json_fp = NULL;
     int ret;
     struct stat statbuf = {};
+    uint64_t program_start = GET_CPU_TICKS();
 
     while( (opt = getopt(argc, argv, "hi:p")) != -1) {
         switch (opt) {
@@ -422,6 +424,8 @@ int main (int argc, char *argv[]) {
         }
     }
 
+    uint64_t program_init = GET_CPU_TICKS();
+
     json_fp = fopen(input_file, "r");
     if (!json_fp) {
         ERROR("Failed to open file [%d][%s]\n", errno, strerror(errno));
@@ -439,7 +443,37 @@ int main (int argc, char *argv[]) {
 
     fclose(json_fp);
 
+    uint64_t program_parse_done = GET_CPU_TICKS();
+
     calculate_haversine_average(preallocate_entries);
+
+    uint64_t program_end = GET_CPU_TICKS();
+
+    uint64_t program_elapsed = program_end - program_start;
+
+    uint64_t program_elapsed_init = program_init - program_start;
+    uint64_t program_elapsed_parse = program_parse_done - program_init;
+    uint64_t program_elapsed_haversine = program_end - program_parse_done;
+
+    printf("   Progran Runtime %lu ticks\t(100%%)\t\t[%lu]ms\t\tCPU Freq: %lu\n",
+        program_elapsed,
+        get_ms_from_cpu_ticks(program_elapsed),
+        guess_cpu_freq(100));
+
+    printf("              Init %lu ticks\t\t(%03.2f%%)\t\t[%lu]ms\n",
+        program_elapsed_init,
+        ((float)program_elapsed_init/(float)program_elapsed)*100,
+        get_ms_from_cpu_ticks(program_elapsed_init));
+
+    printf("        Parse File %lu ticks\t(%03.2f%%)\t[%lu]ms\n",
+        program_elapsed_parse,
+        ((float)program_elapsed_parse/(float)program_elapsed)*100,
+        get_ms_from_cpu_ticks(program_elapsed_parse));
+
+    printf("   Parse Haversine %lu ticks\t(%03.2f%%)\t\t[%lu]ms\n",
+        program_elapsed_haversine,
+        ((float)program_elapsed_haversine/(float)program_elapsed)*100,
+        get_ms_from_cpu_ticks(program_elapsed_haversine));
 
     printf("\n\n");
     printf("=============================\n");
