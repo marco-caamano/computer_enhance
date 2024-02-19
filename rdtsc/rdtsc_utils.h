@@ -20,28 +20,38 @@
  * count of times the function is called for 
  * averages
 */
-#define TAG_FUNCTION_START(index) { \
-        rdtsc_timing_data[index].name = __FUNCTION__; \
-        rdtsc_timing_data[index].start_rdtsc = GET_CPU_TICKS(); \
-        if (profile_current_block_index != -1) { \
-            rdtsc_timing_data[index].parent_index = profile_current_block_index;\
-        } else {\
-            rdtsc_timing_data[index].parent_index = -1; \
-        } \
-        profile_current_block_index = index; \
-}
-
-#define TAG_FUNCTION_END(index) { \
-        rdtsc_timing_data[index].total_ticks +=  GET_CPU_TICKS() - rdtsc_timing_data[index].start_rdtsc; \
-        rdtsc_timing_data[index].count++; \
-        rdtsc_timing_data[index].start_rdtsc = 0; \
-        if (rdtsc_timing_data[index].parent_index != -1) { \
-            profile_current_block_index = rdtsc_timing_data[index].parent_index; \
-            rdtsc_timing_data[profile_current_block_index].children_ticks += rdtsc_timing_data[index].total_ticks; \
+#define TAG_BLOCK_START(index, block_name) { \
+        if (index == profile_current_block_index) { \
+            rdtsc_timing_data[index].recursive_count++; \
         } else { \
-            profile_current_block_index = -1; \
+            rdtsc_timing_data[index].name = block_name; \
+            rdtsc_timing_data[index].start_rdtsc = GET_CPU_TICKS(); \
+            if (profile_current_block_index != -1) { \
+                rdtsc_timing_data[index].parent_index = profile_current_block_index;\
+            } else {\
+                rdtsc_timing_data[index].parent_index = -1; \
+            } \
+            profile_current_block_index = index; \
         } \
 }
+#define TAG_FUNCTION_START(...)   TAG_BLOCK_START(__VA_ARGS__, __FUNCTION__)
+
+#define TAG_BLOCK_END(index) { \
+        if (rdtsc_timing_data[index].recursive_count==0) { \
+            rdtsc_timing_data[index].total_ticks +=  GET_CPU_TICKS() - rdtsc_timing_data[index].start_rdtsc; \
+            rdtsc_timing_data[index].count++; \
+            rdtsc_timing_data[index].start_rdtsc = 0; \
+            if (rdtsc_timing_data[index].parent_index != -1) { \
+                profile_current_block_index = rdtsc_timing_data[index].parent_index; \
+                rdtsc_timing_data[profile_current_block_index].children_ticks += rdtsc_timing_data[index].total_ticks; \
+            } else { \
+                profile_current_block_index = -1; \
+            } \
+        } else { \
+            rdtsc_timing_data[index].recursive_count--; \
+        } \
+}
+#define TAG_FUNCTION_END(...)     TAG_BLOCK_END(__VA_ARGS__)
 
 #define TIMING_DATA_SIZE            4096
 
@@ -52,6 +62,7 @@ struct timing_block {
     uint64_t total_ticks;
     uint64_t count;
     uint64_t children_ticks;
+    int recursive_count;
 };
 
 extern int profile_current_block_index;

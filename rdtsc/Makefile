@@ -1,4 +1,4 @@
-all: librdtsc_utils.a rdtsc rdtsc_test perf_test1 perf_test2 perf_test3
+all: librdtsc_utils.a rdtsc rdtsc_test perf_test1 perf_test2 perf_test3 perf_test4
 
 rdtsc: rdtsc.c
 	gcc -std=c11 -g -Wall -Werror -D_POSIX_C_SOURCE=200809L -D_DEFAULT_SOURCE rdtsc.c -o rdtsc
@@ -24,5 +24,8 @@ perf_test2: perf_test2.c librdtsc_utils.a
 perf_test3: perf_test3.c librdtsc_utils.a
 	gcc -std=c11 -g -Wall -Werror -D_POSIX_C_SOURCE=200809L -D_DEFAULT_SOURCE -L. perf_test3.c -o perf_test3  -lrdtsc_utils
 
+perf_test4: perf_test4.c librdtsc_utils.a
+	gcc -std=c11 -g -Wall -Werror -D_POSIX_C_SOURCE=200809L -D_DEFAULT_SOURCE -L. perf_test4.c -o perf_test4  -lrdtsc_utils
+
 clean:
-	rm -f *.o *.a rdtsc rdtsc_utils rdtsc_test perf_test1 perf_test2 perf_test3
+	rm -f *.o *.a rdtsc rdtsc_utils rdtsc_test perf_test1 perf_test2 perf_test3 perf_test4

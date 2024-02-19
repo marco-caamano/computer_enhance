@@ -16,29 +16,22 @@
 
 enum perf_blocks_e {
     TEST_A,
-    FACTORIAL,
+    TEST_B,
+    TEST_C,
 };
-
-void test_a(void);
-int factorial(int num);
-
-int factorial(int num) {
-    int result;
-    TAG_FUNCTION_START(FACTORIAL);
-    usleep(3000);
-    if (num==0) {
-        result = 1;
-        goto exit;
-    }
-    result = num*factorial(num-1);
-exit:
-    TAG_FUNCTION_END(FACTORIAL);
-    return result;
-}
 
 void test_a(void) {
     TAG_FUNCTION_START(TEST_A);
+    sleep(2);
+
+    TAG_BLOCK_START(TEST_B, "BlockB");
     sleep(1);
+    TAG_BLOCK_END(TEST_B);
+
+    TAG_BLOCK_START(TEST_C, "BlockC");
+    sleep(2);
+    TAG_BLOCK_END(TEST_C);
+
     TAG_FUNCTION_END(TEST_A);
 }
 
@@ -48,10 +41,6 @@ int main (int argc, char *argv[]) {
     printf("==========\n");
     printf("PERF TEST3\n");
     printf("==========\n\n");
-
-    for (int i=0; i<10; i++) {
-        printf("%d!=%d\n", i, factorial(i));
-    }
 
     test_a();
 
