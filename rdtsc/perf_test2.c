@@ -75,7 +75,5 @@ int main (int argc, char *argv[]) {
 
     TAG_PROGRAM_END();
 
-    report_program_timings();
-
     return 0;
 }

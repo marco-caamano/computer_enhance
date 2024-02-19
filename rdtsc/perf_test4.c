@@ -39,14 +39,12 @@ int main (int argc, char *argv[]) {
     TAG_PROGRAM_START();
 
     printf("==========\n");
-    printf("PERF TEST3\n");
+    printf("PERF TEST4\n");
     printf("==========\n\n");
 
     test_a();
 
     TAG_PROGRAM_END();
-
-    report_program_timings();
 
     return 0;
 }
