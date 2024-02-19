@@ -6,7 +6,7 @@ LD_FLAGS	= -L.
 DEPS 		=	rdtsc_utils.h
 
 ifdef PROFILER
-CFLAGS += "-DPROFILER=1"
+CFLAGS += -DPROFILER=1
 endif
 
 %.o: %.c $(DEPS)
