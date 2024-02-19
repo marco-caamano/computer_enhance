@@ -39,6 +39,12 @@
 #define FOUND_X1                0x4
 #define FOUND_Y1                0x8
 
+enum profile_blocks_e {
+    BLOCK_INIT,
+    BLOCK_PARSE_FILE,
+    BLOCK_HAVERSINE,
+};
+
 /*
  * We will support several parsing JSON options:
  * - put all items in a linked list (will malloc for each item)
@@ -165,6 +171,8 @@ void parse_file(FILE *json_fp, bool preallocate_entries) {
     bool found_it;
     int ret;
 
+    TAG_FUNCTION_START(BLOCK_PARSE_FILE);
+
     // first hit the start of json
     found_it = advance_until(json_fp, '{');
     if (!found_it) ERROR("Failed to find start of json\n");
@@ -286,11 +294,14 @@ void parse_file(FILE *json_fp, bool preallocate_entries) {
         data_item_count++;
     }
     LOG("Total Parsed data items [%lu]\n", data_item_count);
+    TAG_FUNCTION_END(BLOCK_PARSE_FILE);
 }
 
 void calculate_haversine_average(bool preallocate_entries) {
     double H_DIST, sum, average = 0;
     uint64_t count_values = 0;
+
+    TAG_BLOCK_START(BLOCK_HAVERSINE, "Haversine");
 
     if (preallocate_entries) {
         // use preallocated array
@@ -335,6 +346,8 @@ void calculate_haversine_average(bool preallocate_entries) {
     printf("Count                 %lu items\n", count_values);
     printf("sum H_DIST            %3.16f\n", sum);
     printf("average H_DIST        %3.16f\n\n", average);
+
+    TAG_BLOCK_END(BLOCK_HAVERSINE);
 }
 
 /*
@@ -365,7 +378,9 @@ int main (int argc, char *argv[]) {
     FILE *json_fp = NULL;
     int ret;
     struct stat statbuf = {};
-    uint64_t program_start = GET_CPU_TICKS();
+    TAG_PROGRAM_START();
+
+    TAG_BLOCK_START(BLOCK_INIT, "Init");
 
     while( (opt = getopt(argc, argv, "hi:p")) != -1) {
         switch (opt) {
@@ -424,7 +439,7 @@ int main (int argc, char *argv[]) {
         }
     }
 
-    uint64_t program_init = GET_CPU_TICKS();
+    TAG_BLOCK_END(BLOCK_INIT);
 
     json_fp = fopen(input_file, "r");
     if (!json_fp) {
@@ -443,37 +458,9 @@ int main (int argc, char *argv[]) {
 
     fclose(json_fp);
 
-    uint64_t program_parse_done = GET_CPU_TICKS();
-
     calculate_haversine_average(preallocate_entries);
 
-    uint64_t program_end = GET_CPU_TICKS();
-
-    uint64_t program_elapsed = program_end - program_start;
-
-    uint64_t program_elapsed_init = program_init - program_start;
-    uint64_t program_elapsed_parse = program_parse_done - program_init;
-    uint64_t program_elapsed_haversine = program_end - program_parse_done;
-
-    printf("   Progran Runtime %lu ticks\t(100%%)\t\t[%lu]ms\t\tCPU Freq: %lu\n",
-        program_elapsed,
-        get_ms_from_cpu_ticks(program_elapsed),
-        guess_cpu_freq(100));
-
-    printf("              Init %lu ticks\t\t(%03.2f%%)\t\t[%lu]ms\n",
-        program_elapsed_init,
-        ((float)program_elapsed_init/(float)program_elapsed)*100,
-        get_ms_from_cpu_ticks(program_elapsed_init));
-
-    printf("        Parse File %lu ticks\t(%03.2f%%)\t[%lu]ms\n",
-        program_elapsed_parse,
-        ((float)program_elapsed_parse/(float)program_elapsed)*100,
-        get_ms_from_cpu_ticks(program_elapsed_parse));
-
-    printf("   Parse Haversine %lu ticks\t(%03.2f%%)\t\t[%lu]ms\n",
-        program_elapsed_haversine,
-        ((float)program_elapsed_haversine/(float)program_elapsed)*100,
-        get_ms_from_cpu_ticks(program_elapsed_haversine));
+    TAG_PROGRAM_END();
 
     printf("\n\n");
     printf("=============================\n");
