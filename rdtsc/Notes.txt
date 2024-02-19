@@ -1,0 +1,13 @@
+==========
+PERF TEST2
+==========
+Progran Runtime Ticks[34003010837](100%) [10000]ms CPU Freq: 3400241740
+Slot[0] Name[test_a] Ticks[27202599810](80.00%) [8000]ms | Children Ticks[17002387582][5000]ms
+Slot[1] Name[test_b] Ticks[10200680136](30.00%) [2999]ms | Children Ticks[3400348806][1000]ms
+Slot[2] Name[test_c] Ticks[3400348806](10.00%) [1000]ms
+Slot[3] Name[test_d] Ticks[6801707446](20.00%) [2000]ms | Children Ticks[3401350956][1000]ms
+Slot[4] Name[test_e] Ticks[3401350956](10.00%) [1000]ms
+
+real    0m10.101s
+user    0m0.101s
+sys     0m0.000s

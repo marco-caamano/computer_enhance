@@ -19,7 +19,14 @@
 
 #define DEFAULT_TEST_FREQ_MS_WAIT   100
 
-static uint64_t calculated_cpu_freq = 0;
+int profile_current_block_index = -1;
+uint64_t rdtsc_program_start = 0;
+uint64_t rdtsc_program_end = 0;
+
+struct timing_block rdtsc_timing_data[TIMING_DATA_SIZE] = {};
+
+uint64_t calculated_cpu_freq = 0;
+
 
 static uint64_t GetOSTimerFreq(void) {
     // How many ticks are in a seconds for the time we are using
@@ -74,4 +81,35 @@ uint64_t get_ms_from_cpu_ticks(uint64_t elapsed_cpu_ticks) {
     return (elapsed_cpu_ticks * GetOSTimerFreq() / 1000) / calculated_cpu_freq;
 }
 
+void report_program_timings(void) {
+    uint64_t program_elapsed = rdtsc_program_end - rdtsc_program_start;
+    printf("Progran Runtime Ticks[%lu](100%%) [%lu]ms CPU Freq: %lu\n",
+        program_elapsed,
+        get_ms_from_cpu_ticks(program_elapsed),
+        guess_cpu_freq(100));
+
+    for (int i=0; i<TIMING_DATA_SIZE; i++) {
+        if ( rdtsc_timing_data[i].name != NULL ) {
+            
+            printf("Slot[%d] Name[%s] Ticks[%lu](%03.2f%%) [%lu]ms", i,
+                rdtsc_timing_data[i].name,
+                rdtsc_timing_data[i].total_ticks,
+                ((float)rdtsc_timing_data[i].total_ticks/(float)program_elapsed)*100,
+                get_ms_from_cpu_ticks(rdtsc_timing_data[i].total_ticks));
+            if (rdtsc_timing_data[i].count>1) {
+                uint64_t average = rdtsc_timing_data[i].total_ticks / rdtsc_timing_data[i].count;
+                printf(" | NumRuns[%lu] Average Ticks[%lu][%lu]ms", 
+                    rdtsc_timing_data[i].count,
+                    average,
+                    get_ms_from_cpu_ticks(average));
+            }
+            if (rdtsc_timing_data[i].children_ticks>0) {
+                printf(" | Children Ticks[%lu][%lu]ms", 
+                    rdtsc_timing_data[i].children_ticks, 
+                    get_ms_from_cpu_ticks(rdtsc_timing_data[i].children_ticks));
+            }
+            printf("\n");
+        }
+    }
+}
 
