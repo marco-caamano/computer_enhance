@@ -13,6 +13,7 @@
     report_profile_results(); \
 }
 
+#ifdef PROFILER
 /*
  * If we are in a recursive function:
  *      profile_index == index
@@ -53,6 +54,15 @@
         } \
 }
 #define TAG_FUNCTION_END(...)     TAG_BLOCK_END(__VA_ARGS__)
+
+#else
+
+#define TAG_BLOCK_START(index, block_name)      {}
+#define TAG_FUNCTION_START(...)                 {}
+#define TAG_BLOCK_END(index)                    {}
+#define TAG_FUNCTION_END(...)                   {}
+
+#endif
 
 #define TIMING_DATA_SIZE            4096
 
