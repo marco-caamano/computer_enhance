@@ -42,6 +42,7 @@
 enum profile_blocks_e {
     BLOCK_INIT,
     BLOCK_PARSE_FILE,
+    BLOCK_PARSE_DATA_FILE,
     BLOCK_HAVERSINE,
 };
 
@@ -171,8 +172,6 @@ void parse_file(FILE *json_fp, bool preallocate_entries) {
     bool found_it;
     int ret;
 
-    TAG_FUNCTION_START(BLOCK_PARSE_FILE);
-
     // first hit the start of json
     found_it = advance_until(json_fp, '{');
     if (!found_it) ERROR("Failed to find start of json\n");
@@ -294,14 +293,13 @@ void parse_file(FILE *json_fp, bool preallocate_entries) {
         data_item_count++;
     }
     LOG("Total Parsed data items [%lu]\n", data_item_count);
-    TAG_FUNCTION_END(BLOCK_PARSE_FILE);
 }
 
 void calculate_haversine_average(bool preallocate_entries) {
     double H_DIST, sum, average = 0;
     uint64_t count_values = 0;
 
-    TAG_BLOCK_START(BLOCK_HAVERSINE, "Haversine");
+    TAG_DATA_BLOCK_START(BLOCK_HAVERSINE, "Haversine", data_item_count*sizeof(struct data_item_s));
 
     if (preallocate_entries) {
         // use preallocated array
@@ -449,7 +447,9 @@ int main (int argc, char *argv[]) {
     printf("Start Parsing File\n");
     printf("------------------\n");
 
+    TAG_DATA_BLOCK_START(BLOCK_PARSE_DATA_FILE, "ParseFileData", (uint64_t)statbuf.st_size);
     parse_file(json_fp, preallocate_entries);
+    TAG_BLOCK_END(BLOCK_PARSE_DATA_FILE);
 
     if (feof(json_fp)==1) {
         printf("-------------------\n");

@@ -108,6 +108,15 @@ void report_profile_results(void) {
                     profile_data[i].children_ticks, 
                     get_ms_from_cpu_ticks(profile_data[i].children_ticks));
             }
+            if (profile_data[i].processed_byte_count) {
+                double megabyte = (double)1024*(double)1024;
+                double gigabyte = megabyte*(double)1024;
+                double seconds = (double)get_ms_from_cpu_ticks(profile_data[i].total_ticks)/(double)1000;
+                double bytes_per_second = (double)profile_data[i].processed_byte_count / seconds;
+                double megabytes = (double)profile_data[i].processed_byte_count / (double)megabyte;
+                double gigabytes_per_second = bytes_per_second / gigabyte;
+                printf(" | %.3fMB at %.2f GB/s", megabytes, gigabytes_per_second);
+            }
             printf("\n");
         }
     }

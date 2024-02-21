@@ -13,7 +13,8 @@
     report_profile_results(); \
 }
 
-#ifdef PROFILER
+#if 1
+// #ifdef PROFILER
 /*
  * If we are in a recursive function:
  *      profile_index == index
@@ -22,12 +23,13 @@
  * count of times the function is called for 
  * averages
 */
-#define TAG_BLOCK_START(index, block_name) { \
+#define TAG_DATA_BLOCK_START(index, block_name, byte_count) { \
         if (index == profile_index) { \
             profile_data[index].recursive_count++; \
         } else { \
             profile_data[index].name = block_name; \
             profile_data[index].start_rdtsc = GET_CPU_TICKS(); \
+            profile_data[index].processed_byte_count = byte_count; \
             if (profile_index != -1) { \
                 profile_data[index].parent_index = profile_index;\
             } else {\
@@ -36,7 +38,9 @@
             profile_index = index; \
         } \
 }
-#define TAG_FUNCTION_START(...)   TAG_BLOCK_START(__VA_ARGS__, __FUNCTION__)
+#define TAG_BLOCK_START(index, block_name) TAG_DATA_BLOCK_START(index, block_name, 0)
+#define TAG_FUNCTION_START(index)   TAG_DATA_BLOCK_START(index, __FUNCTION__, 0)
+#define TAG_DATA_FUNCTION_START(index, byte_count)   TAG_DATA_BLOCK_START(index, __FUNCTION__, byte_count)
 
 #define TAG_BLOCK_END(index) { \
         if (profile_data[index].recursive_count==0) { \
@@ -57,8 +61,10 @@
 
 #else
 
-#define TAG_BLOCK_START(index, block_name)      {}
-#define TAG_FUNCTION_START(...)                 {}
+#define TAG_DATA_BLOCK_START(index, block_name, byte_count)     {}
+#define TAG_BLOCK_START(index, block_name)                      {}
+#define TAG_FUNCTION_START(index)                               {}
+#define TAG_DATA_FUNCTION_START(index, byte_count)              {}
 #define TAG_BLOCK_END(index)                    {}
 #define TAG_FUNCTION_END(...)                   {}
 
@@ -74,6 +80,7 @@ struct profile_block {
     uint64_t count;
     uint64_t children_ticks;
     int recursive_count;
+    uint64_t processed_byte_count;
 };
 
 extern int profile_index;
