@@ -1,0 +1,46 @@
+Timing Performance Notes
+
+==================================================================================================================
+Old Version
+==================================================================================================================
+Progran Runtime Ticks[59067384016](100%) [17371]ms CPU Freq: 3400272680
+Slot[0] Name[Init] Ticks[176970](0.00%) [0]ms
+Slot[2] Name[ParseFileData] Ticks[56158761842](95.08%) [16515]ms | 1035.260MB at 0.06 GB/s
+Slot[3] Name[Haversine] Ticks[2908358300](4.92%) [855]ms | 305.176MB at 0.35 GB/s
+
+Progran Runtime Ticks[59317783493](100%) [17444]ms CPU Freq: 3400300560
+Slot[0] Name[Init] Ticks[186558](0.00%) [0]ms
+Slot[2] Name[ParseFileData] Ticks[56415581709](95.11%) [16591]ms | 1035.260MB at 0.06 GB/s
+Slot[3] Name[Haversine] Ticks[2901896702](4.89%) [853]ms | 305.176MB at 0.35 GB/s
+
+==================================================================================================================
+New Version
+==================================================================================================================
+
+Progran Runtime Ticks[33929809312](100%) [9978]ms CPU Freq: 3400350540
+Slot[0] Name[Init] Ticks[218518](0.00%) [0]ms
+Slot[1] Name[FileReadToMemory] Ticks[2238327610](6.60%) [658]ms | Children Ticks[2238277630][658]ms | 1035.260MB at 1.54 GB/s
+Slot[2] Name[fread] Ticks[2238277630](6.60%) [658]ms | 1035.260MB at 1.54 GB/s
+Slot[4] Name[ParseFileData] Ticks[28600177732](84.29%) [8410]ms | 1035.260MB at 0.12 GB/s
+Slot[5] Name[Haversine] Ticks[3090998072](9.11%) [909]ms | 305.176MB at 0.33 GB/s
+
+Progran Runtime Ticks[33487155662](100%) [9848]ms CPU Freq: 3400299200
+Slot[0] Name[Init] Ticks[156366](0.00%) [0]ms
+Slot[1] Name[FileReadToMemory] Ticks[1725333978](5.15%) [507]ms | Children Ticks[1725292668][507]ms | 1035.260MB at 1.99 GB/s
+Slot[2] Name[fread] Ticks[1725292668](5.15%) [507]ms | 1035.260MB at 1.99 GB/s
+Slot[4] Name[ParseFileData] Ticks[28856926726](86.17%) [8486]ms | 1035.260MB at 0.12 GB/s
+Slot[5] Name[Haversine] Ticks[2904661990](8.67%) [854]ms | 305.176MB at 0.35 GB/s
+
+Progran Runtime Ticks[33060058882](100%) [9722]ms CPU Freq: 3400295120
+Slot[0] Name[Init] Ticks[128520](0.00%) [0]ms
+Slot[1] Name[FileReadToMemory] Ticks[1668532524](5.05%) [490]ms | Children Ticks[1668489990][490]ms | 1035.260MB at 2.06 GB/s
+Slot[2] Name[fread] Ticks[1668489990](5.05%) [490]ms | 1035.260MB at 2.06 GB/s
+Slot[4] Name[ParseFileData] Ticks[28485496208](86.16%) [8377]ms | 1035.260MB at 0.12 GB/s
+Slot[5] Name[Haversine] Ticks[2905810272](8.79%) [854]ms | 305.176MB at 0.35 GB/s
+
+Progran Runtime Ticks[33023314063](100%) [9711]ms CPU Freq: 3400341690
+Slot[0] Name[Init] Ticks[211820](0.00%) [0]ms
+Slot[1] Name[FileReadToMemory] Ticks[1650569338](5.00%) [485]ms | Children Ticks[1650526056][485]ms | 1035.260MB at 2.08 GB/s
+Slot[2] Name[fread] Ticks[1650526056](5.00%) [485]ms | 1035.260MB at 2.08 GB/s
+Slot[4] Name[ParseFileData] Ticks[28462125187](86.19%) [8370]ms | 1035.260MB at 0.12 GB/s
+Slot[5] Name[Haversine] Ticks[2910336250](8.81%) [855]ms | 305.176MB at 0.35 GB/s

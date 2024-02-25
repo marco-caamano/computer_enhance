@@ -2,6 +2,14 @@
 decoder
 simulator
 test_decoder
+bindata_reader
+data_gen
+json_data_parser
+perf_test1
+perf_test2
+perf_test3
+perf_test4
+rdtsc_test
 
 .vscode
 

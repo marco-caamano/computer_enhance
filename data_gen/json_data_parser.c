@@ -41,10 +41,18 @@
 
 enum profile_blocks_e {
     BLOCK_INIT,
+    BLOCK_FILE_READ,
+    BLOCK_FREAD,
     BLOCK_PARSE_FILE,
     BLOCK_PARSE_DATA_FILE,
     BLOCK_HAVERSINE,
 };
+
+size_t file_size = 0;
+uint8_t *file_data = NULL;
+
+uint8_t *file_data_ptr = NULL;
+size_t file_data_remaining = 0;
 
 /*
  * We will support several parsing JSON options:
@@ -102,32 +110,29 @@ bool verbose = false;
  * so this is not really a good way to validate the structure is actually real json
  */
 
-bool advance_until(FILE *fp, char target) {
-    char read_data;
-    int ret;
-    uint64_t count = 0;
-    while(feof(fp)==0) {
-        ret = fread(&read_data, sizeof(char), 1, fp);
-        if (ret == 0) {
-            LOG("Ran out file contents searching for [%c] feof[%d]\n", target, feof(fp));
-        }
-        count++;
-        if (read_data==target) {
+bool advance_until(char target) {
+    uint64_t bytes_consumed = 0;
+    bool found = false;
+    while(!found && file_data_remaining>0) {
+        bytes_consumed++;
+        file_data_remaining--;
+        if ((char)*file_data_ptr==target) {
             // found target and we have already consumed
-            LOG("Found [%c] after [%lu] bytes read\n", target, count);
-            return true;
+            LOG("Found [%c] after [%lu] bytes read\n", target, bytes_consumed);
+            found = true;
         }
+        file_data_ptr++;
     }
-    return false;
+    return found;
 }
 
-bool find_string(FILE *fp, char *string) {
+bool find_string(char *string) {
     bool found_it = false;
     int len = strlen(string);
     LOG("Looking for [%s] len[%d]\n", string, len);
     char *ptr = string;
     for (int i=0; i<len; i++) {
-        found_it = advance_until(fp, *ptr);
+        found_it = advance_until(*ptr);
         if (!found_it) return false;
         ptr++;
     }
@@ -137,54 +142,51 @@ bool find_string(FILE *fp, char *string) {
 
 // similar to advance_until but it will extract the consumed chars to a
 // given buffer, without the last target char
-bool extract_until(FILE *fp, char* buffer, int max_buffer_len, char *target) {
-    char read_data;
-    int ret;
-    uint64_t count = 0;
+bool extract_until(char* buffer, int max_buffer_len, char *target) {
+    uint64_t bytes_consumed = 0;
+    bool found = false;
     // clear buffer so that it is null terminated
     memset(buffer, 0, max_buffer_len);
     char *ptr = buffer;
-    while(1) {
-        ret = fread(&read_data, sizeof(char), 1, fp);
-        if (ret == 0) {
-            ERROR("Ran out file contents searching for [%c]\n", *target);
-        }
-        count++;
-        if (read_data==*target) {
+    while(!found && file_data_remaining>0) {
+        bytes_consumed++;
+        file_data_remaining--;
+        if ((char)*file_data_ptr==*target) {
             // found target and we have already consumed
-            LOG("Found [%c] after [%lu] bytes read buffer[%s]\n", *target, count, buffer);
-            return true;
+            LOG("Found [%c] after [%lu] bytes read buffer[%s]\n", *target, bytes_consumed, buffer);
+            found = true;
         } else {
-            if (count>max_buffer_len) {
+            if (bytes_consumed>max_buffer_len) {
                 ERROR("Overran the target buffer\n");
                 break;
             }
             // copy read char to buffer
-            *ptr = read_data;
+            *ptr = *file_data_ptr;
             ptr++;
         }
+        file_data_ptr++;
     }
     return false;
 }
 
-void parse_file(FILE *json_fp, bool preallocate_entries) {
+void parse_file(bool preallocate_entries) {
     double X0, Y0, X1, Y1 = 0;
     bool found_it;
     int ret;
 
     // first hit the start of json
-    found_it = advance_until(json_fp, '{');
+    found_it = advance_until('{');
     if (!found_it) ERROR("Failed to find start of json\n");
 
     // there may be other json items, we want to find "pairs"
-    found_it = find_string(json_fp, "\"pairs\"");
+    found_it = find_string("\"pairs\"");
     if (!found_it) ERROR("Failed to find pairs item\n");
-    found_it = advance_until(json_fp, ':');
+    found_it = advance_until(':');
     if (!found_it) ERROR("Failed to find item separator\n");
-    found_it = advance_until(json_fp, '[');    // start of json array
+    found_it = advance_until('[');    // start of json array
     if (!found_it) ERROR("Failed to find start of json array\n");
 
-    while(feof(json_fp)==0) {
+    while(file_data_remaining>0) {
         uint8_t found_item = 0;
         uint8_t item_count = 0;
         double value;
@@ -194,15 +196,15 @@ void parse_file(FILE *json_fp, bool preallocate_entries) {
         bool found_y1;
 
         // parse array row
-        found_it = advance_until(json_fp, '{');    // start of row item
+        found_it = advance_until('{');    // start of row item
         if (!found_it) break;
 
         while (item_count<4) {
-            found_it = advance_until(json_fp, '"');    // Start of item id
+            found_it = advance_until('"');    // Start of item id
             if (!found_it) break;
             // next we have the id of a value, can be x0, y0, x1, y1 and then the end '"' if the id
             // extract into item_name_buffer until we find the end of the identifier
-            extract_until(json_fp, item_name_buffer, MAX_ITEM_NAME_LEN, "\"");
+            extract_until(item_name_buffer, MAX_ITEM_NAME_LEN, "\"");
 
             if (strncmp("x0",item_name_buffer,MAX_ITEM_NAME_LEN)==0) {
                 found_item = FOUND_X0;
@@ -215,15 +217,15 @@ void parse_file(FILE *json_fp, bool preallocate_entries) {
             } else {
                 ERROR("Failed to identify item[%s]\n", item_name_buffer);
             }
-            found_it = advance_until(json_fp, ':');    // start of value
+            found_it = advance_until(':');    // start of value
             if (!found_it) break;
 
             if (item_count<3) {
                 // first 3 values end with ','
-                extract_until(json_fp, item_value_buffer, MAX_VALUE_LEN, ",");
+                extract_until(item_value_buffer, MAX_VALUE_LEN, ",");
             } else {
                 // the last item does not end with ',' instead we hit the end of the array item '}'
-                extract_until(json_fp, item_value_buffer, MAX_VALUE_LEN, "}");
+                extract_until(item_value_buffer, MAX_VALUE_LEN, "}");
             }
             
             ret = sscanf((char *)&item_value_buffer, "%lf", &value);
@@ -360,6 +362,43 @@ size_t estimate_total_entries(off_t filesize) {
     return estimated_max_items;
 }
 
+size_t read_file_to_memory(char *filename, size_t size) {
+    FILE *json_fp = NULL;
+
+    TAG_DATA_BLOCK_START(BLOCK_FILE_READ, "FileReadToMemory", size);
+
+    file_size = size;
+    file_data = (uint8_t *)malloc(file_size);
+    if (!file_data) {
+        ERROR("Malloc failed for size[%zu]\n", file_size);
+    }
+
+    file_data_ptr = file_data;
+    file_data_remaining = size;
+
+
+    json_fp = fopen(filename, "r");
+    if (!json_fp) {
+        ERROR("Failed to open file [%d][%s]\n", errno, strerror(errno));
+    }
+
+    TAG_DATA_BLOCK_START(BLOCK_FREAD, "fread", size);
+
+    size_t items_read = fread((void *)file_data, file_size, 1, json_fp);
+
+    TAG_BLOCK_END(BLOCK_FREAD);
+
+    if (items_read != 1) {
+        ERROR("Failed to read expected items [1] instead read[%zu]\n", items_read);
+    }
+
+    fclose(json_fp);
+
+    TAG_BLOCK_END(BLOCK_FILE_READ);
+
+    return file_size;
+}
+
 void usage(void) {
     fprintf(stderr, "Data Generator Binary Reader:\n");
     fprintf(stderr, "-h            This help dialog.\n");
@@ -373,7 +412,6 @@ int main (int argc, char *argv[]) {
     int opt;
     bool preallocate_entries = false;
     char *input_file = NULL;
-    FILE *json_fp = NULL;
     int ret;
     struct stat statbuf = {};
     TAG_PROGRAM_START();
@@ -439,24 +477,17 @@ int main (int argc, char *argv[]) {
 
     TAG_BLOCK_END(BLOCK_INIT);
 
-    json_fp = fopen(input_file, "r");
-    if (!json_fp) {
-        ERROR("Failed to open file [%d][%s]\n", errno, strerror(errno));
+    size_t bytes_read = read_file_to_memory(input_file, statbuf.st_size);
+    if (bytes_read != statbuf.st_size) {
+        ERROR("Failed to read expected bytes\n");
     }
 
     printf("Start Parsing File\n");
     printf("------------------\n");
 
     TAG_DATA_BLOCK_START(BLOCK_PARSE_DATA_FILE, "ParseFileData", (uint64_t)statbuf.st_size);
-    parse_file(json_fp, preallocate_entries);
+    parse_file(preallocate_entries);
     TAG_BLOCK_END(BLOCK_PARSE_DATA_FILE);
-
-    if (feof(json_fp)==1) {
-        printf("-------------------\n");
-        printf("Reached End of File\n\n");
-    }
-
-    fclose(json_fp);
 
     calculate_haversine_average(preallocate_entries);
 
