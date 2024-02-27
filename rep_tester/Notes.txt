@@ -1,0 +1,145 @@
+marco@CharAznable:~/caamao_computer_enhance/rep_tester$ ./rep_test1 -i ../data_gen/data/test_data_seed_1241354235_count_10000000_timestamp_20240220.json -t 30
+==============
+REP Test 1
+==============
+Using filename  [../data_gen/data/test_data_seed_1241354235_count_10000000_timestamp_20240220.json]
+Using runtime   [30]seconds
+
+
+[env_setup] name[FreadTest1]
+[env_setup] Using input_file              [../data_gen/data/test_data_seed_1241354235_count_10000000_timestamp_20240220.json]
+[env_setup]   File Size                   [1085548723] bytes
+[env_setup]   IO Block Size               [4096] bytes
+[env_setup]   Allocated 512B Blocks       [2120224]
+[env_setup] Allocated Buffer              [1085548723] bytes @ [0x7f3aea3af010]
+[env_setup] File Opened OK
+
+==========
+Run [1]  | New MinTime [1349356810]Ticks [396]ms (1035.260MB at 2.55 GB/s)  | New MaxTime [1349356810]Ticks [396]ms (1035.260MB at 2.55 GB/s)
+Run [2]  | New MinTime [911619288]Ticks [268]ms (1035.260MB at 3.77 GB/s)
+Run [3]  | New MinTime [908393844]Ticks [267]ms (1035.260MB at 3.79 GB/s)
+Run [4]  | New MinTime [907733666]Ticks [266]ms (1035.260MB at 3.80 GB/s)
+Run [64]  | New MinTime [906339836]Ticks [266]ms (1035.260MB at 3.80 GB/s)
+Run [114]
+==========
+Test has run for [114]iterations during [31]seconds, interval was set for [30]seconds. Test Run completed
+
+[env_teardown] name[FreadTest1]
+
+
+Test Run Completed. Executed test [114] times
+
+====================================================================================================================================================================================
+
+marco@CharAznable:~/caamao_computer_enhance/rep_tester$ ./rep_test2 -i ../data_gen/data/test_data_seed_1241354235_count_10000000_timestamp_20240220.json -t 30
+==============
+REP Test 2
+==============
+Using filename  [../data_gen/data/test_data_seed_1241354235_count_10000000_timestamp_20240220.json]
+Using runtime   [30]seconds
+
+
+[env_setup] name[FreadTest1]
+[env_setup] Using input_file              [../data_gen/data/test_data_seed_1241354235_count_10000000_timestamp_20240220.json]
+[env_setup]   File Size                   [1085548723] bytes
+[env_setup]   IO Block Size               [4096] bytes
+[env_setup]   Allocated 512B Blocks       [2120224]
+[env_setup] File Opened OK
+
+==========
+Run [1]  | New MinTime [1393936624]Ticks [409]ms (1035.260MB at 2.47 GB/s)  | New MaxTime [1393936624]Ticks [409]ms (1035.260MB at 2.47 GB/s)
+Run [2]  | New MinTime [1189691569]Ticks [349]ms (1035.260MB at 2.90 GB/s)
+Run [3]  | New MinTime [1168322790]Ticks [343]ms (1035.260MB at 2.95 GB/s)
+Run [4]  | New MinTime [1152236166]Ticks [338]ms (1035.260MB at 2.99 GB/s)
+Run [14]  | New MaxTime [1536171458]Ticks [451]ms (1035.260MB at 2.24 GB/s)
+Run [79]  | New MaxTime [1598117113]Ticks [470]ms (1035.260MB at 2.15 GB/s)
+Run [86]
+==========
+Test has run for [86]iterations during [31]seconds, interval was set for [30]seconds. Test Run completed
+
+[env_teardown] name[FreadTest1]
+
+
+Test Run Completed. Executed test [86] times
+
+====================================================================================================================================================================================
+
+
+marco@CharAznable:~/caamao_computer_enhance/rep_tester$ ./rep_test1 -i ../data_gen/data/test_data_seed_1241354235_count_10000000_timestamp_20240220.json -t 20
+==============
+REP Test 1
+==============
+Using filename  [../data_gen/data/test_data_seed_1241354235_count_10000000_timestamp_20240220.json]
+Using runtime   [20]seconds
+
+
+[env_setup] name[FreadTest1]
+[env_setup] Using input_file              [../data_gen/data/test_data_seed_1241354235_count_10000000_timestamp_20240220.json]
+[env_setup]   File Size                   [1085548723] bytes
+[env_setup]   IO Block Size               [4096] bytes
+[env_setup]   Allocated 512B Blocks       [2120224]
+[env_setup] Allocated Buffer              [1085548723] bytes @ [0x7fb4dd0ab010]
+[env_setup] File Opened OK
+
+==========
+Run [00001]  | New MinTime [1399943506]Ticks [411]ms (1035.260MB at 2.46 GB/s)  | New MaxTime [1399943506]Ticks [411]ms (1035.260MB at 2.46 GB/s)
+Run [00002]  | New MinTime [905151978]Ticks [266]ms (1035.260MB at 3.80 GB/s)
+Run [00004]  | New MinTime [901564434]Ticks [265]ms (1035.260MB at 3.82 GB/s)
+Run [00078]
+==========
+Test has run for [78]iterations during [21]seconds, interval was set for [20]seconds. Test Run completed
+
+[env_teardown] name[FreadTest1]
+[rep_tester:68] Calling PrintStats
+[print_stats] name[FreadTest1]
+
+[print_stats] Slowest Speed [1399943506]Ticks [411]ms (1035.260MB at 2.46 GB/s)
+
+[print_stats] Fastest Speed [901564434]Ticks [265]ms (1035.260MB at 3.82 GB/s)
+
+
+Test Run Completed. Executed test [78] times
+
+====================================================================================================================================================================================
+
+
+marco@CharAznable:~/caamao_computer_enhance/rep_tester$ ./rep_test2 -i ../data_gen/data/test_data_seed_1241354235_count_10000000_timestamp_20240220.json -t 20
+==============
+REP Test 2
+==============
+Using filename  [../data_gen/data/test_data_seed_1241354235_count_10000000_timestamp_20240220.json]
+Using runtime   [20]seconds
+
+
+[env_setup] name[FreadTest1]
+[env_setup] Using input_file              [../data_gen/data/test_data_seed_1241354235_count_10000000_timestamp_20240220.json]
+[env_setup]   File Size                   [1085548723] bytes
+[env_setup]   IO Block Size               [4096] bytes
+[env_setup]   Allocated 512B Blocks       [2120224]
+[env_setup] File Opened OK
+
+==========
+Run [00001]  | New MinTime [1365496746]Ticks [401]ms (1035.260MB at 2.52 GB/s)  | New MaxTime [1365496746]Ticks [401]ms (1035.260MB at 2.52 GB/s)
+Run [00002]  | New MinTime [1164971070]Ticks [342]ms (1035.260MB at 2.96 GB/s)
+Run [00009]  | New MinTime [1164124844]Ticks [342]ms (1035.260MB at 2.96 GB/s)
+Run [00012]  | New MinTime [1161410828]Ticks [341]ms (1035.260MB at 2.96 GB/s)
+Run [00018]  | New MinTime [1158244374]Ticks [340]ms (1035.260MB at 2.97 GB/s)
+Run [00023]  | New MaxTime [1438207702]Ticks [422]ms (1035.260MB at 2.40 GB/s)
+Run [00024]  | New MinTime [1157946534]Ticks [340]ms (1035.260MB at 2.97 GB/s)
+Run [00034]  | New MaxTime [1464736676]Ticks [430]ms (1035.260MB at 2.35 GB/s)
+Run [00039]  | New MaxTime [1619399430]Ticks [476]ms (1035.260MB at 2.12 GB/s)
+Run [00056]  | New MinTime [1157608506]Ticks [340]ms (1035.260MB at 2.97 GB/s)
+Run [00058]
+==========
+Test has run for [58]iterations during [21]seconds, interval was set for [20]seconds. Test Run completed
+
+[env_teardown] name[FreadTest1]
+[rep_tester:68] Calling PrintStats
+[print_stats] name[FreadTest1]
+
+[print_stats] Slowest Speed [1619399430]Ticks [476]ms (1035.260MB at 2.12 GB/s)
+
+[print_stats] Fastest Speed [1157608506]Ticks [340]ms (1035.260MB at 2.97 GB/s)
+
+
+Test Run Completed. Executed test [58] times

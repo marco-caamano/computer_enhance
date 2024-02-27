@@ -93,3 +93,5 @@ uint64_t get_ms_from_cpu_ticks(uint64_t elapsed_cpu_ticks);
 
 void report_profile_results(void);
 
+void print_data_speed(uint64_t total_bytes, uint64_t total_cpu_ticks);
+

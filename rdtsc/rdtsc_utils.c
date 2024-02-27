@@ -122,3 +122,14 @@ void report_profile_results(void) {
     }
 }
 
+#define MEGABYTE    ((double)1024*(double)1024)
+#define GIGABYTE    (MEGABYTE*(double)1024)
+
+void print_data_speed(uint64_t total_bytes, uint64_t total_cpu_ticks) {
+    double seconds = (double)get_ms_from_cpu_ticks(total_cpu_ticks) / (double)1000;
+    double bytes_per_second = (double)total_bytes / seconds;
+    double megabytes = (double)total_bytes / MEGABYTE;
+    double gigabytes_per_second = bytes_per_second / GIGABYTE;
+    printf(" [%lu]Ticks [%lu]ms (%.3fMB at %.2f GB/s) ", total_cpu_ticks, get_ms_from_cpu_ticks(total_cpu_ticks), megabytes, gigabytes_per_second);
+}
+
