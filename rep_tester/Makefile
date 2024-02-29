@@ -1,4 +1,4 @@
-all:  libreptester.a rep_test1 rep_test2
+all:  libreptester.a rep_test1 rep_test2 rep_test3 rep_test4
 
 CC			=	gcc
 CFLAGS		=	-I. -I../rdtsc -std=c11 -g -Wall -Werror -D_POSIX_C_SOURCE=200809L -D_DEFAULT_SOURCE
@@ -17,7 +17,13 @@ rep_test1:	rep_test1.o libreptester.a
 rep_test2:	rep_test2.o libreptester.a
 	$(CC) $(LD_FLAGS) $@.o -o $@ -lreptester -lrdtsc_utils
 
+rep_test3:	rep_test3.o libreptester.a
+	$(CC) $(LD_FLAGS) $@.o -o $@ -lreptester -lrdtsc_utils
+
+rep_test4:	rep_test4.o libreptester.a
+	$(CC) $(LD_FLAGS) $@.o -o $@ -lreptester -lrdtsc_utils
+
 .PHONY: clean
 
 clean:
-	rm -f *.o *.a a.out rep_test1 rep_test2
+	rm -f *.o *.a a.out rep_test1 rep_test2 rep_test3 rep_test4

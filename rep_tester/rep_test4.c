@@ -21,84 +21,58 @@
 
 struct test_context {
     char *name;
-    char *filename;
-    size_t filesize;
+    size_t buffer_size;
     uint8_t *buffer;
-    FILE *fp;
     uint64_t min_cpu_ticks;
     uint64_t max_cpu_ticks;
 };
 
 void env_setup(void *context) {
     struct test_context *ctx = (struct test_context *)context;
-    struct stat statbuf = {};
-    int ret;
 
     printf("[%s] name[%s]\n", __FUNCTION__, ctx->name);
-    ret = stat(ctx->filename, &statbuf);
-    if (ret != 0) {
-        ERROR("Unable to get filestats[%d][%s]\n", errno, strerror(errno));
-    }
-    printf("[%s] Using input_file              [%s]\n", __FUNCTION__, ctx->filename);
-    printf("[%s]   File Size                   [%lu] bytes\n", __FUNCTION__, statbuf.st_size);
-    printf("[%s]   IO Block Size               [%lu] bytes\n", __FUNCTION__, statbuf.st_blksize);
-    printf("[%s]   Allocated 512B Blocks       [%lu]\n", __FUNCTION__, statbuf.st_blocks);
 
-    ctx->filesize = statbuf.st_size;
-    ctx->buffer = malloc(ctx->filesize);
-
-    if (!ctx->buffer) {
-         ERROR("Malloc failed for size[%zu]\n", ctx->filesize);
-    }
-    printf("[%s] Allocated Buffer              [%lu] bytes @ [%p]\n", __FUNCTION__, ctx->filesize, ctx->buffer);
-
-    ctx->fp = fopen(ctx->filename, "r");
-    if (!ctx->fp) {
-        ERROR("Failed to open file [%d][%s]\n", errno, strerror(errno));
-    }
-    printf("[%s] File Opened OK\n", __FUNCTION__);
+    ctx->buffer_size = 1024*1024*1024;
 }
 
 void env_teardown(void *context) {
     struct test_context *ctx = (struct test_context *)context;
     printf("[%s] name[%s]\n", __FUNCTION__, ctx->name);
-
-    fclose(ctx->fp);
-
-    free(ctx->buffer);
-    ctx->buffer = 0;
 }
 
 void test_setup(void *context) {
     struct test_context *ctx = (struct test_context *)context;
-    // reset file to start
-    int ret = fseek(ctx->fp, 0, SEEK_SET);
-    if (ret!=0) {
-        ERROR("Fseek Failed\n");
+    ctx->buffer = malloc(ctx->buffer_size);
+    if (!ctx->buffer) {
+         ERROR("Malloc failed for size[%zu]\n", ctx->buffer_size);
     }
 }
 
 void test_main(void *context) {
     bool new_new_line = false;
     struct test_context *ctx = (struct test_context *)context;
-    uint64_t start = GET_CPU_TICKS();
-    size_t items_read = fread((void *)ctx->buffer, ctx->filesize, 1, ctx->fp);
-    uint64_t elapsed_ticks = GET_CPU_TICKS() - start;
 
-    if (items_read != 1) {
-        ERROR("Failed to read expected items [1] instead read[%zu] | ferror(%d)\n", items_read, ferror(ctx->fp));
+    uint64_t data = 0x5a5a5a5a5a5a5a5a;
+    uint32_t count = ctx->buffer_size / sizeof(uint64_t);
+    uint64_t *ptr = (uint64_t *)ctx->buffer;
+
+    uint64_t start = GET_CPU_TICKS();
+    for (uint32_t i=0; i<count; i++) {
+        *ptr = data | i;
+        ptr++;
     }
+    uint64_t elapsed_ticks = GET_CPU_TICKS() - start;
 
     if (ctx->min_cpu_ticks==0 || elapsed_ticks < ctx->min_cpu_ticks) {
         ctx->min_cpu_ticks = elapsed_ticks;
         printf(" | New MinTime");
-        print_data_speed(ctx->filesize, elapsed_ticks);
+        print_data_speed(ctx->buffer_size, elapsed_ticks);
         new_new_line = true;
     }
     if (elapsed_ticks > ctx->max_cpu_ticks) {
         ctx->max_cpu_ticks = elapsed_ticks;
         printf(" | New MaxTime");
-        print_data_speed(ctx->filesize, elapsed_ticks);
+        print_data_speed(ctx->buffer_size, elapsed_ticks);
         new_new_line = true;
     }
 
@@ -108,7 +82,9 @@ void test_main(void *context) {
 }
 
 void test_teardown(void *context) {
-    // struct test_context *ctx = (struct test_context *)context;
+    struct test_context *ctx = (struct test_context *)context;
+    free(ctx->buffer);
+    ctx->buffer = 0;
 }
 
 
@@ -120,11 +96,11 @@ void print_stats(void *context) {
     printf("\n");
 
     printf("[%s] Slowest Speed", __FUNCTION__);
-    print_data_speed(ctx->filesize, ctx->max_cpu_ticks);
+    print_data_speed(ctx->buffer_size, ctx->max_cpu_ticks);
     printf("\n\n");
 
     printf("[%s] Fastest Speed", __FUNCTION__);
-    print_data_speed(ctx->filesize, ctx->min_cpu_ticks);
+    print_data_speed(ctx->buffer_size, ctx->min_cpu_ticks);
     printf("\n\n");
 
     int ret = getrusage(RUSAGE_SELF, &usage);
@@ -141,24 +117,18 @@ void print_stats(void *context) {
 void usage(void) {
     fprintf(stderr, "Rep Test 1 Usage:\n");
     fprintf(stderr, "-h             This help dialog.\n");
-    fprintf(stderr, "-i <filename>  Use <filename> as input.\n");
     fprintf(stderr, "-t <runtime>   Set runtime in seconds. (defaults to 10seconds)\n");
 }
 
 int main (int argc, char *argv[]) {
     int opt;
-    char *filename = NULL;
     int runtime = 10;
 
-    while( (opt = getopt(argc, argv, "hi:t:")) != -1) {
+    while( (opt = getopt(argc, argv, "ht:")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
                 exit(0);
-                break;
-
-            case 'i':
-                filename = strdup(optarg);
                 break;
 
             case 't':
@@ -173,16 +143,11 @@ int main (int argc, char *argv[]) {
         }
     }
 
-    if (!filename) {
-        ERROR("Must pass a filename\n");
-    }
-
     printf("==============\n");
-    printf("REP Test 1\n");
+    printf("REP Test 4\n");
     printf("==============\n");
 
 
-    printf("Using filename  [%s]\n", filename);
     printf("Using runtime   [%d]seconds\n", runtime);
 
     struct rep_tester_config foo = {};
@@ -195,8 +160,7 @@ int main (int argc, char *argv[]) {
     foo.test_runtime_seconds = runtime;
 
     struct test_context my_context = {};
-    my_context.name = "FreadTest1";
-    my_context.filename = filename;
+    my_context.name = "WriteTest_malloc";
 
 
     printf("\n\n");

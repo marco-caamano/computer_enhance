@@ -8,6 +8,8 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 
 #include "reptester.h"
 #include "rdtsc_utils.h"
@@ -111,6 +113,8 @@ void test_teardown(void *context) {
 
 void print_stats(void *context) {
     struct test_context *ctx = (struct test_context *)context;
+    struct rusage usage = {};
+
     printf("[%s] name[%s]\n", __FUNCTION__, ctx->name);
     printf("\n");
 
@@ -120,6 +124,13 @@ void print_stats(void *context) {
 
     printf("[%s] Fastest Speed", __FUNCTION__);
     print_data_speed(ctx->filesize, ctx->min_cpu_ticks);
+    printf("\n\n");
+
+    int ret = getrusage(RUSAGE_SELF, &usage);
+    if (ret != 0) {
+        ERROR("Failed to call getrusage errno(%d)[%s]\n", errno, strerror(errno));
+    }
+    printf("[%s] Soft PageFautls (No IO): %lu  | Hard PageFautls (IO): %lu\n", __FUNCTION__, usage.ru_minflt, usage.ru_majflt);
     printf("\n");
 }
 
@@ -183,7 +194,7 @@ int main (int argc, char *argv[]) {
     foo.test_runtime_seconds = runtime;
 
     struct test_context my_context = {};
-    my_context.name = "FreadTest1";
+    my_context.name = "FreadTest2";
     my_context.filename = filename;
 
 

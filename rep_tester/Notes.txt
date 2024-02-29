@@ -143,3 +143,167 @@ Test has run for [58]iterations during [21]seconds, interval was set for [20]sec
 
 
 Test Run Completed. Executed test [58] times
+
+====================================================================================================================================================================================
+
+==============
+REP Test 1
+==============
+Using filename  [../data_gen/data/test_data_seed_1241354235_count_10000000_timestamp_20240220.json]
+Using runtime   [20]seconds
+
+
+[env_setup] name[FreadTest1]
+[env_setup] Using input_file              [../data_gen/data/test_data_seed_1241354235_count_10000000_timestamp_20240220.json]
+[env_setup]   File Size                   [1085548723] bytes
+[env_setup]   IO Block Size               [4096] bytes
+[env_setup]   Allocated 512B Blocks       [2120224]
+[env_setup] Allocated Buffer              [1085548723] bytes @ [0x7fb7c94dd010]
+[env_setup] File Opened OK
+
+==========
+Run [00001]  | New MinTime [1325463412]Ticks [389]ms (1035.260MB at 2.60 GB/s)  | New MaxTime [1325463412]Ticks [389]ms (1035.260MB at 2.60 GB/s)
+Run [00002]  | New MinTime [896259550]Ticks [263]ms (1035.260MB at 3.84 GB/s)
+Run [00003]  | New MinTime [894949734]Ticks [263]ms (1035.260MB at 3.84 GB/s)
+Run [00004]  | New MinTime [890299112]Ticks [261]ms (1035.260MB at 3.87 GB/s)
+Run [00007]  | New MinTime [888829054]Ticks [261]ms (1035.260MB at 3.87 GB/s)
+Run [00013]  | New MinTime [888758742]Ticks [261]ms (1035.260MB at 3.87 GB/s)
+Run [00024]  | New MinTime [885550740]Ticks [260]ms (1035.260MB at 3.89 GB/s)
+Run [00032]  | New MinTime [884976820]Ticks [260]ms (1035.260MB at 3.89 GB/s)
+Run [00080]
+==========
+Test has run for [80]iterations during [21]seconds, interval was set for [20]seconds. Test Run completed
+
+[env_teardown] name[FreadTest1]
+[rep_tester:68] Calling PrintStats
+[print_stats] name[FreadTest1]
+
+[print_stats] Slowest Speed [1325463412]Ticks [389]ms (1035.260MB at 2.60 GB/s)
+
+[print_stats] Fastest Speed [884976820]Ticks [260]ms (1035.260MB at 3.89 GB/s)
+
+[print_stats] Soft PageFautls (No IO): 932  | Hard PageFautls (IO): 0
+
+
+
+Test Run Completed. Executed test [80] times
+
+====================================================================================================================================================================================
+
+
+==============
+REP Test 2
+==============
+Using filename  [../data_gen/data/test_data_seed_1241354235_count_10000000_timestamp_20240220.json]
+Using runtime   [20]seconds
+
+
+[env_setup] name[FreadTest2]
+[env_setup] Using input_file              [../data_gen/data/test_data_seed_1241354235_count_10000000_timestamp_20240220.json]
+[env_setup]   File Size                   [1085548723] bytes
+[env_setup]   IO Block Size               [4096] bytes
+[env_setup]   Allocated 512B Blocks       [2120224]
+[env_setup] File Opened OK
+
+==========
+Run [00001]  | New MinTime [1491800082]Ticks [438]ms (1035.260MB at 2.31 GB/s)  | New MaxTime [1491800082]Ticks [438]ms (1035.260MB at 2.31 GB/s)
+Run [00002]  | New MinTime [1147942476]Ticks [337]ms (1035.260MB at 3.00 GB/s)
+Run [00006]  | New MinTime [1146178930]Ticks [337]ms (1035.260MB at 3.00 GB/s)
+Run [00009]  | New MinTime [1143148986]Ticks [336]ms (1035.260MB at 3.01 GB/s)
+Run [00012]  | New MinTime [1142040110]Ticks [335]ms (1035.260MB at 3.02 GB/s)
+Run [00059]
+==========
+Test has run for [59]iterations during [21]seconds, interval was set for [20]seconds. Test Run completed
+
+[env_teardown] name[FreadTest2]
+[rep_tester:68] Calling PrintStats
+[print_stats] name[FreadTest2]
+
+[print_stats] Slowest Speed [1491800082]Ticks [438]ms (1035.260MB at 2.31 GB/s)
+
+[print_stats] Fastest Speed [1142040110]Ticks [335]ms (1035.260MB at 3.02 GB/s)
+
+[print_stats] Soft PageFautls (No IO): 49652  | Hard PageFautls (IO): 0
+
+
+
+Test Run Completed. Executed test [59] times
+
+====================================================================================================================================================================================
+
+==============
+REP Test 3
+==============
+Using runtime   [30]seconds
+
+
+[env_setup] name[WriteTest_no_malloc]
+[env_setup] Allocated Buffer              [1073741824] bytes @ [0x7f70d5519010]
+
+==========
+Run [00001]  | New MinTime [880144638]Ticks [258]ms (1024.000MB at 3.88 GB/s)  | New MaxTime [880144638]Ticks [258]ms (1024.000MB at 3.88 GB/s)
+Run [00002]  | New MinTime [450488610]Ticks [132]ms (1024.000MB at 7.58 GB/s)
+Run [00008]  | New MinTime [448862798]Ticks [132]ms (1024.000MB at 7.58 GB/s)
+Run [00013]  | New MinTime [446544814]Ticks [131]ms (1024.000MB at 7.63 GB/s)
+Run [00014]  | New MinTime [446495241]Ticks [131]ms (1024.000MB at 7.63 GB/s)
+Run [00015]  | New MinTime [443791324]Ticks [130]ms (1024.000MB at 7.69 GB/s)
+Run [00019]  | New MinTime [442473178]Ticks [130]ms (1024.000MB at 7.69 GB/s)
+Run [00032]  | New MinTime [442131750]Ticks [130]ms (1024.000MB at 7.69 GB/s)
+Run [00038]  | New MinTime [441151190]Ticks [129]ms (1024.000MB at 7.75 GB/s)
+Run [00062]  | New MinTime [440978504]Ticks [129]ms (1024.000MB at 7.75 GB/s)
+Run [00232]
+==========
+Test has run for [232]iterations during [31]seconds, interval was set for [30]seconds. Test Run completed
+
+[env_teardown] name[WriteTest_no_malloc]
+[rep_tester:68] Calling PrintStats
+[print_stats] name[WriteTest_no_malloc]
+
+[print_stats] Slowest Speed [880144638]Ticks [258]ms (1024.000MB at 3.88 GB/s)
+
+[print_stats] Fastest Speed [440978504]Ticks [129]ms (1024.000MB at 7.75 GB/s)
+
+[print_stats] Soft PageFautls (No IO): 1115  | Hard PageFautls (IO): 0
+
+
+
+Test Run Completed. Executed test [232] times
+
+====================================================================================================================================================================================
+
+==============
+REP Test 4
+==============
+Using runtime   [30]seconds
+
+
+[env_setup] name[WriteTest_malloc]
+
+==========
+Run [00001]  | New MinTime [865542896]Ticks [254]ms (1024.000MB at 3.94 GB/s)  | New MaxTime [865542896]Ticks [254]ms (1024.000MB at 3.94 GB/s)
+Run [00002]  | New MinTime [701147388]Ticks [206]ms (1024.000MB at 4.85 GB/s)
+Run [00003]  | New MinTime [697457980]Ticks [205]ms (1024.000MB at 4.88 GB/s)
+Run [00006]  | New MinTime [696729802]Ticks [204]ms (1024.000MB at 4.90 GB/s)
+Run [00009]  | New MinTime [695756382]Ticks [204]ms (1024.000MB at 4.90 GB/s)
+Run [00050]  | New MaxTime [875470708]Ticks [257]ms (1024.000MB at 3.89 GB/s)
+Run [00066]  | New MinTime [695392412]Ticks [204]ms (1024.000MB at 4.90 GB/s)
+Run [00144]  | New MaxTime [896433460]Ticks [263]ms (1024.000MB at 3.80 GB/s)
+Run [00146]
+==========
+Test has run for [146]iterations during [31]seconds, interval was set for [30]seconds. Test Run completed
+
+[env_teardown] name[WriteTest_malloc]
+[rep_tester:68] Calling PrintStats
+[print_stats] name[WriteTest_malloc]
+
+[print_stats] Slowest Speed [896433460]Ticks [263]ms (1024.000MB at 3.80 GB/s)
+
+[print_stats] Fastest Speed [695392412]Ticks [204]ms (1024.000MB at 4.90 GB/s)
+
+[print_stats] Soft PageFautls (No IO): 149594  | Hard PageFautls (IO): 0
+
+
+
+Test Run Completed. Executed test [146] times
+
+====================================================================================================================================================================================
