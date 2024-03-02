@@ -10,6 +10,10 @@ perf_test2
 perf_test3
 perf_test4
 rdtsc_test
+rep_test1
+rep_test2
+rep_test3
+rep_test4
 
 .vscode
 
