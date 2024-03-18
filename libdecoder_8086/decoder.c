@@ -3,19 +3,30 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
+#ifndef _WIN32
 #include <getopt.h>
 #include <unistd.h>
+#endif
 #include <errno.h>
+
+#ifdef _WIN32
+#include <BaseTsd.h>
+typedef SSIZE_T ssize_t;
+#endif
 
 #include "libdecoder.h"
 
 #define BUFFER_SIZE 1024*1024
 
 void usage(void) {
+#ifdef _WIN32
+    fprintf(stderr, "8086 Instruction Decoder Usage: decoder.exe <input_file> [verbose]\n\n");
+#else
     fprintf(stderr, "8086 Instruction Decoder Usage:\n");
     fprintf(stderr, "-h         This help dialog.\n");
     fprintf(stderr, "-i <file>  Path to file to parse.\n");
     fprintf(stderr, "-v         Enable verbose output.\n");
+#endif
 }
 
 
@@ -29,6 +40,16 @@ int main (int argc, char *argv[]) {
     FILE *in_fp = NULL;
     struct decoded_instruction_s instruction = {};
 
+#ifdef _WIN32
+    if (argc<2) {
+        usage();
+        exit(1);
+    }
+    if (argc==3) {
+        verbose = true;
+    }
+    input_file = strdup(argv[1]);
+#else
     while( (opt = getopt(argc, argv, "hi:v")) != -1) {
         switch (opt) {
             case 'h':
@@ -51,6 +72,7 @@ int main (int argc, char *argv[]) {
                 break;
         }
     }
+#endif
 
     LOG("=============================\n");
     LOG("Test 8086 Instruction Decoder\n");
@@ -73,7 +95,7 @@ int main (int argc, char *argv[]) {
     
     in_fp = fopen(input_file, "r");
     if (!in_fp) {
-        fprintf(stderr, "ERROR input_file fopen failed [%d][%s]\n", errno, strerror(errno));
+        fprintf(stderr, "ERROR input_file[%s] fopen failed [%d][%s]\n", input_file, errno, strerror(errno));
         exit(1);
     }
     LOG("Opened Input file[%s] OK\n", input_file);

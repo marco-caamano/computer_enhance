@@ -1,3 +1,6 @@
+# ignore build subdirectories
+build
+
 # ignore binaries
 decoder
 simulator

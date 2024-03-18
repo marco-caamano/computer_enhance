@@ -4,7 +4,9 @@
  */
 #include <stdint.h>
 #include <stdbool.h>
+#ifndef _WIN32
 #include <aio.h>
+#endif
 
 #define LOG(...) {                  \
         if (verbose) {              \

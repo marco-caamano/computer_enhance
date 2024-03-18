@@ -3,8 +3,10 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
+#ifndef _WIN32
 #include <getopt.h>
 #include <unistd.h>
+#endif
 #include <errno.h>
 
 #define LOG(...) {                  \
@@ -149,11 +151,15 @@ char *byte_count_str[] = {
 };
 
 void usage(void) {
+#ifdef _WIN32
+    fprintf(stderr, "8086 Instruction Decoder Usage: decoder.exe <input_file> <output_file> [verbose]\n\n");
+#else
     fprintf(stderr, "8086 Instruction Decoder Usage:\n");
     fprintf(stderr, "-h         This help dialog.\n");
     fprintf(stderr, "-i <file>  Path to file to parse.\n");
     fprintf(stderr, "-o <file>  Path to file to generate output.\n");
     fprintf(stderr, "-v         Enable verbose output.\n");
+#endif
 }
 
 /*
@@ -1072,12 +1078,23 @@ int process_jump_op_inst(uint8_t *ptr, int op_type) {
 
 
 int main (int argc, char *argv[]) {
-    int opt;
     char *input_file = NULL;
     char *output_file = NULL;    
     uint8_t *buffer = NULL;
     size_t bytes_available;
 
+#ifdef _WIN32
+    if (argc<3) {
+        usage();
+        exit(1);
+    }
+    if (argc==4) {
+        verbose = true;
+    }
+    input_file = strdup(argv[1]);
+    output_file = strdup(argv[2]);
+#else
+    int opt;
     while( (opt = getopt(argc, argv, "hi:o:v")) != -1) {
         switch (opt) {
             case 'h':
@@ -1104,6 +1121,7 @@ int main (int argc, char *argv[]) {
                 break;
         }
     }
+#endif
 
     LOG("========================\n");
     LOG("8086 Instruction Decoder\n");
@@ -1132,14 +1150,14 @@ int main (int argc, char *argv[]) {
     
     in_fp = fopen(input_file, "r");
     if (!in_fp) {
-        fprintf(stderr, "ERROR input_file fopen failed [%d][%s]\n", errno, strerror(errno));
+        fprintf(stderr, "ERROR input_file[%s] fopen failed [%d][%s]\n", input_file, errno, strerror(errno));
         exit(1);
     }
     LOG("Opened Input file[%s] OK\n", input_file);
 
     out_fp = fopen(output_file, "w");
     if (!in_fp) {
-        fprintf(stderr, "ERROR output_file fopen failed [%d][%s]\n", errno, strerror(errno));
+        fprintf(stderr, "ERROR output_file[%s] fopen failed [%d][%s]\n", output_file, errno, strerror(errno));
         exit(1);
     }
     LOG("Opened Output file[%s] OK\n\n", output_file);
