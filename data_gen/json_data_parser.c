@@ -3,8 +3,10 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
+#ifndef _WIN32
 #include <getopt.h>
 #include <unistd.h>
+#endif
 #include <errno.h>
 #include <math.h>
 #define __USE_UNIX98
@@ -14,8 +16,8 @@
 #include "haversine.h"
 #include "rdtsc_utils.h"
 
-#define ERROR(...) {                    \
-        fprintf(stderr, "[%d]", __LINE__);      \
+#define MY_ERROR(...) {                    \
+        fprintf(stderr, "[%s:%d]", __FUNCTION__, __LINE__);      \
         fprintf(stderr, __VA_ARGS__);   \
         exit(1);                        \
     }
@@ -111,7 +113,7 @@ bool verbose = false;
  */
 
 bool advance_until(char target) {
-    uint64_t bytes_consumed = 0;
+    unsigned int bytes_consumed = 0;
     bool found = false;
     while(!found && file_data_remaining>0) {
         bytes_consumed++;
@@ -143,7 +145,7 @@ bool find_string(char *string) {
 // similar to advance_until but it will extract the consumed chars to a
 // given buffer, without the last target char
 bool extract_until(char* buffer, int max_buffer_len, char *target) {
-    uint64_t bytes_consumed = 0;
+    unsigned int bytes_consumed = 0;
     bool found = false;
     // clear buffer so that it is null terminated
     memset(buffer, 0, max_buffer_len);
@@ -157,7 +159,7 @@ bool extract_until(char* buffer, int max_buffer_len, char *target) {
             found = true;
         } else {
             if (bytes_consumed>max_buffer_len) {
-                ERROR("Overran the target buffer\n");
+                MY_ERROR("Overran the target buffer\n");
                 break;
             }
             // copy read char to buffer
@@ -176,15 +178,15 @@ void parse_file(bool preallocate_entries) {
 
     // first hit the start of json
     found_it = advance_until('{');
-    if (!found_it) ERROR("Failed to find start of json\n");
+    if (!found_it) MY_ERROR("Failed to find start of json\n");
 
     // there may be other json items, we want to find "pairs"
     found_it = find_string("\"pairs\"");
-    if (!found_it) ERROR("Failed to find pairs item\n");
+    if (!found_it) MY_ERROR("Failed to find pairs item\n");
     found_it = advance_until(':');
-    if (!found_it) ERROR("Failed to find item separator\n");
+    if (!found_it) MY_ERROR("Failed to find item separator\n");
     found_it = advance_until('[');    // start of json array
-    if (!found_it) ERROR("Failed to find start of json array\n");
+    if (!found_it) MY_ERROR("Failed to find start of json array\n");
 
     while(file_data_remaining>0) {
         uint8_t found_item = 0;
@@ -215,7 +217,7 @@ void parse_file(bool preallocate_entries) {
             } else if (strncmp("y1",item_name_buffer,MAX_ITEM_NAME_LEN)==0) {
                 found_item = FOUND_Y1;
             } else {
-                ERROR("Failed to identify item[%s]\n", item_name_buffer);
+                MY_ERROR("Failed to identify item[%s]\n", item_name_buffer);
             }
             found_it = advance_until(':');    // start of value
             if (!found_it) break;
@@ -230,7 +232,7 @@ void parse_file(bool preallocate_entries) {
             
             ret = sscanf((char *)&item_value_buffer, "%lf", &value);
             if (ret!=1) {
-                ERROR("Failed to parse value from [%s]\n", item_value_buffer);
+                MY_ERROR("Failed to parse value from [%s]\n", item_value_buffer);
             }
             LOG("Found value [%3.16f]\n", value);
             switch (found_item) {
@@ -251,14 +253,14 @@ void parse_file(bool preallocate_entries) {
                     found_y1 = true;
                     break;
                 default:
-                    ERROR("Invalid found_item[%d]\n", found_item);
+                    MY_ERROR("Invalid found_item[%d]\n", found_item);
                     break;
             }
             item_count++;
         }
 
         if (!found_x0 || !found_y0 || !found_x1 || !found_y1) {
-            ERROR("Invalid row format, failed to find all items\n");
+            MY_ERROR("Invalid row format, failed to find all items\n");
         }
         LOG("Parsed x0:%3.16f, y0:%3.16f, x1:%3.16f, y1:%3.16f \n", X0, Y0, X1, Y1);
 
@@ -273,7 +275,7 @@ void parse_file(bool preallocate_entries) {
             // use linked list
             struct list_item_s *item = malloc(sizeof(struct list_item_s));
             if (!item) {
-                ERROR("Failed to allocate [%lu]bytes for item", sizeof(struct list_item_s));
+                MY_ERROR("Failed to allocate [%zu]bytes for item", sizeof(struct list_item_s));
             }
             item->data_item.x0 = X0;
             item->data_item.y0 = Y0;
@@ -294,12 +296,14 @@ void parse_file(bool preallocate_entries) {
         }
         data_item_count++;
     }
-    LOG("Total Parsed data items [%lu]\n", data_item_count);
+    LOG("Total Parsed data items [%zu]\n", data_item_count);
 }
 
 void calculate_haversine_average(bool preallocate_entries) {
-    double H_DIST, sum, average = 0;
-    uint64_t count_values = 0;
+    double H_DIST = 0;
+    double sum = 0;
+    double average = 0;
+    unsigned int count_values = 0;
 
     TAG_DATA_BLOCK_START(BLOCK_HAVERSINE, "Haversine", data_item_count*sizeof(struct data_item_s));
 
@@ -319,7 +323,7 @@ void calculate_haversine_average(bool preallocate_entries) {
     } else {
         // sanity check
         if (!list_head || !list_tail) {
-            ERROR("Sanity check failed for linked list");
+            MY_ERROR("Sanity check failed for linked list");
         }
         // use linked list
         struct list_item_s *item = list_head;
@@ -370,16 +374,19 @@ size_t read_file_to_memory(char *filename, size_t size) {
     file_size = size;
     file_data = (uint8_t *)malloc(file_size);
     if (!file_data) {
-        ERROR("Malloc failed for size[%zu]\n", file_size);
+        MY_ERROR("Malloc failed for size[%zu]\n", file_size);
     }
 
     file_data_ptr = file_data;
     file_data_remaining = size;
 
-
+#ifdef _WIN32
+    json_fp = fopen(filename, "rb");
+#else
     json_fp = fopen(filename, "r");
+#endif
     if (!json_fp) {
-        ERROR("Failed to open file [%d][%s]\n", errno, strerror(errno));
+        MY_ERROR("Failed to open file [%d][%s]\n", errno, strerror(errno));
     }
 
     TAG_DATA_BLOCK_START(BLOCK_FREAD, "fread", size);
@@ -389,7 +396,7 @@ size_t read_file_to_memory(char *filename, size_t size) {
     TAG_BLOCK_END(BLOCK_FREAD);
 
     if (items_read != 1) {
-        ERROR("Failed to read expected items [1] instead read[%zu]\n", items_read);
+        MY_ERROR("Failed to read expected items [1] instead read[%zu]\n", items_read);
     }
 
     fclose(json_fp);
@@ -418,6 +425,34 @@ int main (int argc, char *argv[]) {
 
     TAG_BLOCK_START(BLOCK_INIT, "Init");
 
+#ifdef _WIN32
+    // fprintf(stderr, "Data Generator Binary Reader:\n");
+    // fprintf(stderr, "-h            This help dialog.\n");
+    // fprintf(stderr, "-i <bin_file> Path to binary file.\n");
+    // fprintf(stderr, "-p            Estimate Max Item count and preallocate a memory for all items,\n");
+    // fprintf(stderr, "              default is to malloc each item and use a linked list.\n");
+    // fprintf(stderr, "-v            Enable Verbose Output.\n");
+    for (int index=1; index<argc; ++index) {
+        if (strcmp(argv[index], "-h")==0) {
+            usage();
+            exit(0);
+        } else if (strcmp(argv[index], "-i")==0) {
+            // must have at least index+2 arguments to contain a file
+            if (argc<index+2) {
+                printf("ERROR: missing Number of Data Points to generate\n");
+                usage();
+                exit(1);
+            }
+            input_file = strdup(argv[index+1]);
+            // since we consume the next parameter then skip it
+            ++index;
+        } else if (strcmp(argv[index], "-p")==0) {
+            preallocate_entries = true;
+        } else if (strcmp(argv[index], "-v")==0) {
+            verbose = true;
+        }
+    }
+#else
     while( (opt = getopt(argc, argv, "hi:p")) != -1) {
         switch (opt) {
             case 'h':
@@ -438,12 +473,13 @@ int main (int argc, char *argv[]) {
                 break;
 
             default:
-                fprintf(stderr, "ERROR Invalid command line option\n");
+                fprintf(stderr, "MY_ERROR Invalid command line option\n");
                 usage();
                 exit(1);
                 break;
         }
     }
+#endif
 
     if (!input_file) {
         usage();
@@ -457,21 +493,22 @@ int main (int argc, char *argv[]) {
     printf("Using input_file              [%s]\n", input_file);
     ret = stat(input_file, &statbuf);
     if (ret != 0) {
-        ERROR("Unable to get filestats[%d][%s]\n", errno, strerror(errno));
+        MY_ERROR("Unable to get filestats[%d][%s]\n", errno, strerror(errno));
     }
-    printf("Using input_file              [%s]\n", input_file);
     printf("PreAllocating entries         [%s]\n", preallocate_entries ? "True" : "False");
     printf("  File Size                   [%lu] bytes\n", statbuf.st_size);
+#ifndef _WIN32
     printf("  IO Block Size               [%lu] bytes\n", statbuf.st_blksize);
     printf("  Allocated 512B Blocks       [%lu]\n", statbuf.st_blocks);
+#endif
     size_t item_estimate = estimate_total_entries(statbuf.st_size);
-    printf("  Estimated Items             [%lu]\n", item_estimate);
+    printf("  Estimated Items             [%zu]\n", item_estimate);
     printf("\n\n");
 
     if (preallocate_entries) {
         data_array = malloc(item_estimate * sizeof(struct data_item_s));
         if (!data_array) {
-            ERROR("Failed to malloc [%lu]bytes for data array\n", item_estimate * sizeof(struct data_item_s));
+            MY_ERROR("Failed to malloc [%zu]bytes for data array\n", item_estimate * sizeof(struct data_item_s));
         }
     }
 
@@ -479,8 +516,9 @@ int main (int argc, char *argv[]) {
 
     size_t bytes_read = read_file_to_memory(input_file, statbuf.st_size);
     if (bytes_read != statbuf.st_size) {
-        ERROR("Failed to read expected bytes\n");
+        MY_ERROR("Failed to read expected bytes\n");
     }
+    printf("Read %zu bytes\n", statbuf.st_size);
 
     printf("Start Parsing File\n");
     printf("------------------\n");

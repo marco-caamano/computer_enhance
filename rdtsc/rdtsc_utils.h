@@ -1,6 +1,12 @@
 #include <stdint.h>
 #include <stdio.h>
+
+#if _WIN32
+#include <intrin.h>
+#include <windows.h>
+#else
 #include <x86intrin.h>
+#endif
 
 #define GET_CPU_TICKS()  __rdtsc()
 

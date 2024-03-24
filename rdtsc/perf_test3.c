@@ -3,16 +3,21 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
-#include <getopt.h>
-#include <unistd.h>
 #include <errno.h>
 
-#include "rdtsc_utils.h"
+#ifdef _WIN32
+#include <Windows.h>
+#include <synchapi.h>
+#define SLEEP(x) Sleep(x*1000)
+#define MSLEEP(x) Sleep(x)
+#else
+#include <getopt.h>
+#include <unistd.h>
+#define SLEEP(x) sleep(x)
+#define MSLEEP(x) usleep(x*1000)
+#endif
 
-#define ERROR(...) {                    \
-        fprintf(stderr, __VA_ARGS__);   \
-        exit(1);                        \
-    }
+#include "rdtsc_utils.h"
 
 enum perf_blocks_e {
     TEST_A,
@@ -25,7 +30,7 @@ int factorial(int num);
 int factorial(int num) {
     int result;
     TAG_FUNCTION_START(FACTORIAL);
-    usleep(3000);
+    MSLEEP(3);
     if (num==0) {
         result = 1;
         goto exit;
@@ -38,7 +43,7 @@ exit:
 
 void test_a(void) {
     TAG_FUNCTION_START(TEST_A);
-    sleep(1);
+    SLEEP(1);
     TAG_FUNCTION_END(TEST_A);
 }
 

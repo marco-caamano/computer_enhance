@@ -3,8 +3,10 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
+#ifndef _WIN32
 #include <getopt.h>
 #include <unistd.h>
+#endif
 #include <errno.h>
 #include <time.h>
 
@@ -15,7 +17,7 @@
  * Y -90 to 90 degrees
  */
 
-#define ERROR(...) {                    \
+#define MY_ERROR(...) {                    \
         fprintf(stderr, __VA_ARGS__);   \
         exit(1);                        \
     }
@@ -98,15 +100,45 @@ int main (int argc, char *argv[]) {
     FILE *json_fp = NULL;
     FILE *binary_fp = NULL;
     FILE *stats_fp = NULL;
-    uint64_t count = 0;
+    unsigned int count = 0;
     unsigned int seed = 0;
     time_t temp;
     struct tm *timeptr;
     int ret;
-    uint64_t binary_write_count = 0;
+    unsigned int binary_write_count = 0;
     double cluster_x = 0;
     double cluster_y = 0;
 
+#ifdef _WIN32
+    for (int index=1; index<argc; ++index) {
+        if (strcmp(argv[index], "-h")==0) {
+            usage();
+            exit(0);
+        } else if (strcmp(argv[index], "-n")==0) {
+            // must have at least index+2 arguments to contain a file
+            if (argc<index+2) {
+                printf("ERROR: missing Number of Data Points to generate\n");
+                usage();
+                exit(1);
+            }
+            count = strtoull(argv[index+1], NULL, 0);
+            // since we consume the next parameter then skip it
+            ++index;
+        } else if (strcmp(argv[index], "-s")==0) {
+            // must have at least index+2 arguments to contain a file
+            if (argc<index+2) {
+                printf("ERROR: missing seed to use\n");
+                usage();
+                exit(1);
+            }
+            seed = strtoul(argv[index+1], NULL, 0);
+            // since we consume the next parameter then skip it
+            ++index;
+        } else if (strcmp(argv[index], "-c")==0) {
+            is_clustered = true;
+        }
+    }
+#else
     while( (opt = getopt(argc, argv, "chn:s:")) != -1) {
         switch (opt) {
             case 'c':
@@ -127,12 +159,13 @@ int main (int argc, char *argv[]) {
                 break;
 
             default:
-                fprintf(stderr, "ERROR Invalid command line option\n");
+                fprintf(stderr, "MY_ERROR Invalid command line option\n");
                 usage();
                 exit(1);
                 break;
         }
     }
+#endif
 
     if (count==0) {
         usage();
@@ -152,26 +185,26 @@ int main (int argc, char *argv[]) {
     // ret = strftime((char *)&timestamp, MAX_TIMESTAMP_LEN,"%Y%m%d_%H%M%S", timeptr);
     ret = strftime((char *)&timestamp, MAX_TIMESTAMP_LEN,"%Y%m%d", timeptr);
     if (ret>=MAX_TIMESTAMP_LEN) {
-       ERROR("Timestamp overflow\n");
+       MY_ERROR("Timestamp overflow\n");
     }
 
-    ret = snprintf((char *)&json_outfile, MAX_FILENAME_LEN, "test_data_seed_%u_count_%lu_timestamp_%s.json", seed, count, timestamp);
+    ret = snprintf((char *)&json_outfile, MAX_FILENAME_LEN, "test_data_seed_%u_count_%u_timestamp_%s.json", seed, count, timestamp);
     if (ret>=MAX_FILENAME_LEN) {
-       ERROR("Json filename overflow\n");
+       MY_ERROR("Json filename overflow\n");
     }
 
-    ret = snprintf((char *)&binary_outfile, MAX_FILENAME_LEN, "test_data_seed_%u_count_%lu_timestamp_%s.bin", seed, count, timestamp);
+    ret = snprintf((char *)&binary_outfile, MAX_FILENAME_LEN, "test_data_seed_%u_count_%u_timestamp_%s.bin", seed, count, timestamp);
     if (ret>=MAX_FILENAME_LEN) {
-       ERROR("Json filename overflow\n");
+       MY_ERROR("Binary filename overflow\n");
     }
 
-    ret = snprintf((char *)&stats_outfile, MAX_FILENAME_LEN, "test_data_seed_%u_count_%lu_timestamp_%s.txt", seed, count, timestamp);
+    ret = snprintf((char *)&stats_outfile, MAX_FILENAME_LEN, "test_data_seed_%u_count_%u_timestamp_%s.txt", seed, count, timestamp);
     if (ret>=MAX_FILENAME_LEN) {
-       ERROR("Json filename overflow\n");
+       MY_ERROR("Stats filename overflow\n");
     }
 
     printf("Distribution             [%s]\n", is_clustered ? "Clustered" : "Uniform");
-    printf("Using Count              [%lu]\n", count);
+    printf("Using Count              [%u]\n", count);
     printf("Using Seed               [%u]\n", seed);
     printf("Using RAND_MAX           [%u]\n", RAND_MAX);
     printf("Using timestamp          [%s]\n", timestamp);
@@ -185,19 +218,19 @@ int main (int argc, char *argv[]) {
 
     json_fp = fopen(json_outfile, "w");
     if (!json_fp) {
-        ERROR("Failed to open json file [%d][%s]\n", errno, strerror(errno));
+        MY_ERROR("Failed to open json file [%d][%s]\n", errno, strerror(errno));
     }
     binary_fp = fopen(binary_outfile, "w");
     if (!binary_fp) {
-        ERROR("Failed to open binary file [%d][%s]\n", errno, strerror(errno));
+        MY_ERROR("Failed to open binary file [%d][%s]\n", errno, strerror(errno));
     }
     stats_fp = fopen(stats_outfile, "w");
     if (!stats_fp) {
-        ERROR("Failed to open stats file [%d][%s]\n", errno, strerror(errno));
+        MY_ERROR("Failed to open stats file [%d][%s]\n", errno, strerror(errno));
     }
 
     fprintf(stats_fp, "Distribution             [%s]\n", is_clustered ? "Clustered" : "Uniform");
-    fprintf(stats_fp, "Using Count              [%lu]\n", count);
+    fprintf(stats_fp, "Using Count              [%u]\n", count);
     fprintf(stats_fp, "Using Seed               [%u]\n", seed);
     fprintf(stats_fp, "Using RAND_MAX           [%u]\n", RAND_MAX);
     fprintf(stats_fp, "Using timestamp          [%s]\n", timestamp);
@@ -280,13 +313,13 @@ int main (int argc, char *argv[]) {
 
     
     double average = sum/count;
-    printf("binary_write_count     %lu\n", binary_write_count);
-    printf("binary_bytes_writen    %lu\n", binary_write_count*sizeof(double));
+    printf("binary_write_count     %u\n", binary_write_count);
+    printf("binary_bytes_writen    %zu\n", binary_write_count*sizeof(double));
     printf("sum H_DIST             %3.16f\n", sum);
     printf("average H_DIST         %3.16f\n\n", average);
 
-    fprintf(stats_fp, "binary_write_count       %lu\n", binary_write_count);
-    fprintf(stats_fp, "binary_bytes_writen      %lu\n", binary_write_count*sizeof(double));
+    fprintf(stats_fp, "binary_write_count       %u\n", binary_write_count);
+    fprintf(stats_fp, "binary_bytes_writen      %zu\n", binary_write_count*sizeof(double));
     fprintf(stats_fp, "sum H_DIST               %3.16f\n", sum);
     fprintf(stats_fp, "average H_DIST           %3.16f\n\n", average);
 

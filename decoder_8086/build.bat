@@ -2,6 +2,6 @@
 IF NOT EXIST build mkdir build
 pushd build
 
-call cl -Zi -FC ..\decoder.c 
+call cl -Zi -FC ..\decoder.c || echo "Command Failed" && popd && exit /B
 
 popd

@@ -3,13 +3,15 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
+#ifndef _WIN32
 #include <getopt.h>
 #include <unistd.h>
+#endif
 #include <errno.h>
 
 #include "haversine.h"
 
-#define ERROR(...) {                    \
+#define MY_ERROR(...) {                    \
         fprintf(stderr, "[%d]", __LINE__);      \
         fprintf(stderr, __VA_ARGS__);   \
         exit(1);                        \
@@ -28,13 +30,31 @@ int main (int argc, char *argv[]) {
     int opt;
     char *input_file = NULL;
     FILE *binary_fp = NULL;
-    uint64_t count = 0;
+    unsigned int count = 0;
     int ret;
-    uint64_t binary_write_count = 0;
+    unsigned int binary_write_count = 0;
     double X0, Y0, X1, Y1 = 0;
     double H_DIST, H_DIST_CALC, sum = 0;
     double delta = 0;
 
+#ifdef _WIN32
+    for (int index=1; index<argc; ++index) {
+        if (strcmp(argv[index], "-h")==0) {
+            usage();
+            exit(0);
+        } else if (strcmp(argv[index], "-i")==0) {
+            // must have at least index+2 arguments to contain a file
+            if (argc<index+2) {
+                printf("ERROR: missing input file parameter\n");
+                usage();
+                exit(1);
+            }
+            input_file = strdup(argv[index+1]);
+            // since we consume the next parameter then skip it
+            ++index;
+        }
+    }
+#else
     while( (opt = getopt(argc, argv, "hi:")) != -1) {
         switch (opt) {
             case 'h':
@@ -47,12 +67,13 @@ int main (int argc, char *argv[]) {
                 break;
 
             default:
-                fprintf(stderr, "ERROR Invalid command line option\n");
+                fprintf(stderr, "MY_ERROR Invalid command line option\n");
                 usage();
                 exit(1);
                 break;
         }
     }
+#endif
 
     if (!input_file) {
         usage();
@@ -68,7 +89,7 @@ int main (int argc, char *argv[]) {
 
     binary_fp = fopen(input_file, "r");
     if (!binary_fp) {
-        ERROR("Failed to open binary file [%d][%s]\n", errno, strerror(errno));
+        MY_ERROR("Failed to open binary file [%d][%s]\n", errno, strerror(errno));
     }
 
     while (1) {
@@ -86,7 +107,7 @@ int main (int argc, char *argv[]) {
         delta = H_DIST - H_DIST_CALC;
         // printf("x0:%3.16f, y0:%3.16f, x1:%3.16f, y1:%3.16f | h_dist:%3.16f | h_dist_calc:%3.16f | delta:%3.16f\n", X0, Y0, X1, Y1, H_DIST, H_DIST_CALC, delta);
         if (delta!=0) {
-            ERROR("Delta[%3.16f] for a row[%lu] is not zero\n", delta, count);
+            MY_ERROR("Delta[%3.16f] for a row[%lu] is not zero\n", delta, count);
         }
         sum += H_DIST_CALC;
         binary_write_count += 5;
@@ -98,7 +119,7 @@ int main (int argc, char *argv[]) {
    
     double average = sum/count;
     printf("binary_write_count     %lu\n", binary_write_count);
-    printf("binary_bytes_writen    %lu\n", binary_write_count*sizeof(double));
+    printf("binary_bytes_writen    %zu\n", binary_write_count*sizeof(double));
     printf("sum H_DIST_CALC        %3.16f\n", sum);
     printf("average H_DIST_CALC    %3.16f\n\n", average);
 

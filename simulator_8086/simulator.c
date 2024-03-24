@@ -3,11 +3,18 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
+#ifndef _WIN32
 #include <getopt.h>
 #include <unistd.h>
+#endif
 #include <errno.h>
 
-#include "libdecoder.h"
+#ifdef _WIN32
+#include <BaseTsd.h>
+typedef SSIZE_T ssize_t;
+#endif
+
+#include <libdecoder.h>
 
 /* 8086 can address up to 1MB of Memory, but since we 
  * are not going to use the segment registers we will
@@ -763,6 +770,41 @@ int main (int argc, char *argv[]) {
     size_t bytes_available;
     struct decoded_instruction_s instruction = {};
 
+#ifdef _WIN32
+    for (int index=1; index<argc; ++index) {
+        if (strcmp(argv[index], "-h")==0) {
+            usage();
+            exit(0);
+        } else if (strcmp(argv[index], "-i")==0) {
+            // must have at least index+2 arguments to contain a file
+            if (argc<index+2) {
+                printf("ERROR: missing input file parameter\n");
+                usage();
+                exit(1);
+            }
+            input_file = strdup(argv[index+1]);
+            // since we consume the next parameter then skip it
+            ++index;
+        } else if (strcmp(argv[index], "-o")==0) {
+            // must have at least index+2 arguments to contain a file
+            if (argc<index+2) {
+                printf("ERROR: missing output file parameter\n");
+                usage();
+                exit(1);
+            }
+            dump_file = true;
+            output_file = strdup(argv[index+1]);
+            // since we consume the next parameter then skip it
+            ++index;
+        } else if (strcmp(argv[index], "-m")==0) {
+            dump_memory = true;
+        } else if (strcmp(argv[index], "-v")==0) {
+                verbose = true;
+        } else if (strcmp(argv[index], "-t")==0) {
+                trace = true;
+        }
+    }
+#else
     while( (opt = getopt(argc, argv, "hi:mo:vt")) != -1) {
         switch (opt) {
             case 'h':
@@ -798,6 +840,7 @@ int main (int argc, char *argv[]) {
                 break;
         }
     }
+#endif
 
     LOG("==========================\n");
     LOG("8086 Instruction Simulator\n");
@@ -816,11 +859,17 @@ int main (int argc, char *argv[]) {
     if (dump_memory) {
         LOG("Dumping NonZero Memory Enabled\n");
     }
+    if (verbose) {
+        LOG("Verbose Outuput Enabled\n");
+    }
+    if (trace) {
+        LOG("Trace Outuput Enabled\n");
+    }
     LOG("\n\n");
 
     in_fp = fopen(input_file, "r");
     if (!in_fp) {
-        fprintf(stderr, "ERROR input_file fopen failed [%d][%s]\n", errno, strerror(errno));
+        fprintf(stderr, "ERROR input_file[%s] fopen failed [%d][%s]\n", input_file, errno, strerror(errno));
         exit(1);
     }
 
@@ -930,7 +979,7 @@ int main (int argc, char *argv[]) {
     if (dump_file) {
         out_fp = fopen(output_file, "w");
         if (!out_fp) {
-            fprintf(stderr, "ERROR output_file fopen failed [%d][%s]\n", errno, strerror(errno));
+            fprintf(stderr, "ERROR output_file[%s] fopen failed [%d][%s]\n", output_file, errno, strerror(errno));
             exit(1);
         }
 

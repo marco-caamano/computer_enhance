@@ -3,16 +3,13 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
-#include <getopt.h>
-#include <unistd.h>
 #include <errno.h>
 #include <time.h>
-#include <x86intrin.h>
-#include <sys/time.h>
+#include <inttypes.h>
 
 #include "rdtsc_utils.h"
 
-#define ERROR(...) {                    \
+#define MY_ERROR(...) {                    \
         fprintf(stderr, __VA_ARGS__);   \
         exit(1);                        \
     }
@@ -27,8 +24,32 @@ struct profile_block profile_data[TIMING_DATA_SIZE] = {};
 
 uint64_t calculated_cpu_freq = 0;
 
+#if _WIN32
 
-static uint64_t GetOSTimerFreq(void) {
+#include <intrin.h>
+#include <windows.h>
+
+static uint64_t GetOSTimerFreq(void)
+{
+	LARGE_INTEGER Freq;
+	QueryPerformanceFrequency(&Freq);
+	return Freq.QuadPart;
+}
+
+static uint64_t ReadOSTimer(void)
+{
+	LARGE_INTEGER Value;
+	QueryPerformanceCounter(&Value);
+	return Value.QuadPart;
+}
+
+#else
+
+#include <x86intrin.h>
+#include <sys/time.h>
+
+static uint64_t GetOSTimerFreq(void)
+{
     // How many ticks are in a seconds for the time we are using
     // gettimeofday returns values in microseconds so 10^6 ticks/second
 	return 1000000;
@@ -44,6 +65,7 @@ static uint64_t ReadOSTimer(void)
 	uint64_t Result = GetOSTimerFreq()*(uint64_t)Value.tv_sec + (uint64_t)Value.tv_usec;
 	return Result;
 }
+#endif
 
 uint64_t guess_cpu_freq(int wait_ms) {
     uint64_t OSFreq = GetOSTimerFreq();
@@ -75,7 +97,7 @@ uint64_t get_ms_from_cpu_ticks(uint64_t elapsed_cpu_ticks) {
         guess_cpu_freq(DEFAULT_TEST_FREQ_MS_WAIT);
     }
     if (calculated_cpu_freq == 0) {
-        ERROR("Failed to get CPU Frequency\n");
+        MY_ERROR("Failed to get CPU Frequency\n");
     }
 
     return (elapsed_cpu_ticks * GetOSTimerFreq() / 1000) / calculated_cpu_freq;
@@ -83,7 +105,7 @@ uint64_t get_ms_from_cpu_ticks(uint64_t elapsed_cpu_ticks) {
 
 void report_profile_results(void) {
     uint64_t program_elapsed = profile_program_end - profile_program_start;
-    printf("Progran Runtime Ticks[%lu](100%%) [%lu]ms CPU Freq: %lu\n",
+    printf("Progran Runtime Ticks[%" PRIu64 "](100%%) [%" PRIu64 "]ms CPU Freq: %I64u\n",
         program_elapsed,
         get_ms_from_cpu_ticks(program_elapsed),
         guess_cpu_freq(100));
@@ -91,20 +113,20 @@ void report_profile_results(void) {
     for (int i=0; i<TIMING_DATA_SIZE; i++) {
         if ( profile_data[i].name != NULL ) {
             
-            printf("Slot[%d] Name[%s] Ticks[%lu](%03.2f%%) [%lu]ms", i,
+            printf("Slot[%d] Name[%s] Ticks[%" PRIu64 "](%03.2f%%) [%" PRIu64 "]ms", i,
                 profile_data[i].name,
                 profile_data[i].total_ticks,
                 ((float)profile_data[i].total_ticks/(float)program_elapsed)*100,
                 get_ms_from_cpu_ticks(profile_data[i].total_ticks));
             if (profile_data[i].count>1) {
                 uint64_t average = profile_data[i].total_ticks / profile_data[i].count;
-                printf(" | NumRuns[%lu] Average Ticks[%lu][%lu]ms", 
+                printf(" | NumRuns[%" PRIu64 "] Average Ticks[%" PRIu64 "][%" PRIu64 "]ms", 
                     profile_data[i].count,
                     average,
                     get_ms_from_cpu_ticks(average));
             }
             if (profile_data[i].children_ticks>0) {
-                printf(" | Children Ticks[%lu][%lu]ms", 
+                printf(" | Children Ticks[%" PRIu64 "][%" PRIu64 "]ms", 
                     profile_data[i].children_ticks, 
                     get_ms_from_cpu_ticks(profile_data[i].children_ticks));
             }
@@ -130,6 +152,6 @@ void print_data_speed(uint64_t total_bytes, uint64_t total_cpu_ticks) {
     double bytes_per_second = (double)total_bytes / seconds;
     double megabytes = (double)total_bytes / MEGABYTE;
     double gigabytes_per_second = bytes_per_second / GIGABYTE;
-    printf(" [%lu]Ticks [%lu]ms (%.3fMB at %.2f GB/s) ", total_cpu_ticks, get_ms_from_cpu_ticks(total_cpu_ticks), megabytes, gigabytes_per_second);
+    printf(" [%" PRIu64 "]Ticks [%" PRIu64 "]ms (%.3fMB at %.2f GB/s) ", total_cpu_ticks, get_ms_from_cpu_ticks(total_cpu_ticks), megabytes, gigabytes_per_second);
 }
 
