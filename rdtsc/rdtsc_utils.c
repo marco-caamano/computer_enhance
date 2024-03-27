@@ -28,6 +28,14 @@ uint64_t calculated_cpu_freq = 0;
 
 #include <intrin.h>
 #include <windows.h>
+#include <psapi.h>
+
+struct os_metrics
+{
+    bool Initialized;
+    HANDLE ProcessHandle;
+};
+static struct os_metrics GlobalMetrics;
 
 static uint64_t GetOSTimerFreq(void)
 {
@@ -41,6 +49,29 @@ static uint64_t ReadOSTimer(void)
 	LARGE_INTEGER Value;
 	QueryPerformanceCounter(&Value);
 	return Value.QuadPart;
+}
+
+uint64_t ReadOSPageFaultCount(void)
+{
+    PROCESS_MEMORY_COUNTERS_EX MemoryCounters = {};
+    MemoryCounters.cb = sizeof(MemoryCounters);
+
+    if(!GlobalMetrics.Initialized) {
+        InitializeOSMetrics();
+    }
+
+    GetProcessMemoryInfo(GlobalMetrics.ProcessHandle, (PROCESS_MEMORY_COUNTERS *)&MemoryCounters, sizeof(MemoryCounters));
+    
+    uint64_t Result = MemoryCounters.PageFaultCount;
+    return Result;
+}
+
+void InitializeOSMetrics(void)
+{
+    if(!GlobalMetrics.Initialized) {
+        GlobalMetrics.Initialized = true;
+        GlobalMetrics.ProcessHandle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, GetCurrentProcessId());
+    }
 }
 
 #else
@@ -65,6 +96,27 @@ static uint64_t ReadOSTimer(void)
 	uint64_t Result = GetOSTimerFreq()*(uint64_t)Value.tv_sec + (uint64_t)Value.tv_usec;
 	return Result;
 }
+
+static uint64_t ReadOSPageFaultCount(void)
+{
+    // NOTE(casey): The course materials are not tested on MacOS/Linux.
+    // This code was contributed to the public github. It may or may not work
+    // for your system.
+    
+    struct rusage Usage = {};
+    getrusage(RUSAGE_SELF, &Usage);
+    
+    // ru_minflt  the number of page faults serviced without any I/O activity.
+    // ru_majflt  the number of page faults serviced that required I/O activity.
+    uint64_t Result = Usage.ru_minflt + Usage.ru_majflt;
+    
+    return Result;
+}
+
+static void InitializeOSMetrics(void)
+{
+}
+
 #endif
 
 uint64_t guess_cpu_freq(int wait_ms) {

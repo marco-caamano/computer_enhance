@@ -2,8 +2,10 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#ifndef _WIN32
 #include <getopt.h>
 #include <unistd.h>
+#endif
 #include <string.h>
 #include <errno.h>
 #include <sys/types.h>
@@ -14,7 +16,7 @@
 #include "reptester.h"
 #include "rdtsc_utils.h"
 
-#define ERROR(...) {                    \
+#define MY_ERROR(...) {                    \
         fprintf(stderr, __VA_ARGS__);   \
         exit(1);                        \
     }
@@ -44,7 +46,7 @@ void test_setup(void *context) {
     struct test_context *ctx = (struct test_context *)context;
     ctx->buffer = malloc(ctx->buffer_size);
     if (!ctx->buffer) {
-         ERROR("Malloc failed for size[%zu]\n", ctx->buffer_size);
+         MY_ERROR("Malloc failed for size[%zu]\n", ctx->buffer_size);
     }
 }
 
@@ -105,7 +107,7 @@ void print_stats(void *context) {
 
     int ret = getrusage(RUSAGE_SELF, &usage);
     if (ret != 0) {
-        ERROR("Failed to call getrusage errno(%d)[%s]\n", errno, strerror(errno));
+        MY_ERROR("Failed to call getrusage errno(%d)[%s]\n", errno, strerror(errno));
     }
     printf("[%s] Soft PageFautls (No IO): %lu  | Hard PageFautls (IO): %lu\n", __FUNCTION__, usage.ru_minflt, usage.ru_majflt);
     printf("\n");
@@ -136,7 +138,7 @@ int main (int argc, char *argv[]) {
                 break;
 
             default:
-                fprintf(stderr, "ERROR Invalid command line option\n");
+                fprintf(stderr, "MY_ERROR Invalid command line option\n");
                 usage();
                 exit(1);
                 break;

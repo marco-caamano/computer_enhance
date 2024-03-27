@@ -2,8 +2,10 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#ifndef _WIN32
 #include <getopt.h>
 #include <unistd.h>
+#endif
 #include <string.h>
 #include <errno.h>
 #include <sys/types.h>
@@ -14,7 +16,7 @@
 #include "reptester.h"
 #include "rdtsc_utils.h"
 
-#define ERROR(...) {                    \
+#define MY_ERROR(...) {                    \
         fprintf(stderr, __VA_ARGS__);   \
         exit(1);                        \
     }
@@ -37,18 +39,20 @@ void env_setup(void *context) {
     printf("[%s] name[%s]\n", __FUNCTION__, ctx->name);
     ret = stat(ctx->filename, &statbuf);
     if (ret != 0) {
-        ERROR("Unable to get filestats[%d][%s]\n", errno, strerror(errno));
+        MY_ERROR("Unable to get filestats[%d][%s]\n", errno, strerror(errno));
     }
     printf("[%s] Using input_file              [%s]\n", __FUNCTION__, ctx->filename);
     printf("[%s]   File Size                   [%lu] bytes\n", __FUNCTION__, statbuf.st_size);
+#ifndef _WIN32
     printf("[%s]   IO Block Size               [%lu] bytes\n", __FUNCTION__, statbuf.st_blksize);
     printf("[%s]   Allocated 512B Blocks       [%lu]\n", __FUNCTION__, statbuf.st_blocks);
+#endif
 
     ctx->filesize = statbuf.st_size;
 
     ctx->fp = fopen(ctx->filename, "r");
     if (!ctx->fp) {
-        ERROR("Failed to open file [%d][%s]\n", errno, strerror(errno));
+        MY_ERROR("Failed to open file [%d][%s]\n", errno, strerror(errno));
     }
     printf("[%s] File Opened OK\n", __FUNCTION__);
 }
@@ -65,13 +69,13 @@ void test_setup(void *context) {
 
     ctx->buffer = malloc(ctx->filesize);
     if (!ctx->buffer) {
-         ERROR("Malloc failed for size[%zu]\n", ctx->filesize);
+         MY_ERROR("Malloc failed for size[%zu]\n", ctx->filesize);
     }
 
     // reset file to start
     int ret = fseek(ctx->fp, 0, SEEK_SET);
     if (ret!=0) {
-        ERROR("Fseek Failed\n");
+        MY_ERROR("Fseek Failed\n");
     }
 }
 
@@ -83,7 +87,7 @@ void test_main(void *context) {
     uint64_t elapsed_ticks = GET_CPU_TICKS() - start;
 
     if (items_read != 1) {
-        ERROR("Failed to read expected items [1] instead read[%zu] | ferror(%d)\n", items_read, ferror(ctx->fp));
+        MY_ERROR("Failed to read expected items [1] instead read[%zu] | ferror(%d)\n", items_read, ferror(ctx->fp));
     }
 
     if (ctx->min_cpu_ticks==0 || elapsed_ticks < ctx->min_cpu_ticks) {
@@ -128,7 +132,7 @@ void print_stats(void *context) {
 
     int ret = getrusage(RUSAGE_SELF, &usage);
     if (ret != 0) {
-        ERROR("Failed to call getrusage errno(%d)[%s]\n", errno, strerror(errno));
+        MY_ERROR("Failed to call getrusage errno(%d)[%s]\n", errno, strerror(errno));
     }
     printf("[%s] Soft PageFautls (No IO): %lu  | Hard PageFautls (IO): %lu\n", __FUNCTION__, usage.ru_minflt, usage.ru_majflt);
     printf("\n");
@@ -165,7 +169,7 @@ int main (int argc, char *argv[]) {
                 break;
 
             default:
-                fprintf(stderr, "ERROR Invalid command line option\n");
+                fprintf(stderr, "MY_ERROR Invalid command line option\n");
                 usage();
                 exit(1);
                 break;
@@ -173,7 +177,7 @@ int main (int argc, char *argv[]) {
     }
 
     if (!filename) {
-        ERROR("Must pass a filename\n");
+        MY_ERROR("Must pass a filename\n");
     }
 
     printf("==============\n");

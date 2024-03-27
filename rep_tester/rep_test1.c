@@ -2,19 +2,22 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#ifdef _WIN32
+#include <Windows.h>
+#else
 #include <getopt.h>
 #include <unistd.h>
+#include <sys/resource.h>
+#endif
 #include <string.h>
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/time.h>
-#include <sys/resource.h>
 
 #include "reptester.h"
 #include "rdtsc_utils.h"
 
-#define ERROR(...) {                    \
+#define MY_ERROR(...) {                 \
         fprintf(stderr, __VA_ARGS__);   \
         exit(1);                        \
     }
@@ -27,6 +30,8 @@ struct test_context {
     FILE *fp;
     uint64_t min_cpu_ticks;
     uint64_t max_cpu_ticks;
+    uint64_t faults_before;
+    uint64_t faults_after;
 };
 
 void env_setup(void *context) {
@@ -37,24 +42,30 @@ void env_setup(void *context) {
     printf("[%s] name[%s]\n", __FUNCTION__, ctx->name);
     ret = stat(ctx->filename, &statbuf);
     if (ret != 0) {
-        ERROR("Unable to get filestats[%d][%s]\n", errno, strerror(errno));
+        MY_ERROR("Unable to get filestats[%d][%s]\n", errno, strerror(errno));
     }
     printf("[%s] Using input_file              [%s]\n", __FUNCTION__, ctx->filename);
     printf("[%s]   File Size                   [%lu] bytes\n", __FUNCTION__, statbuf.st_size);
+#ifndef _WIN32
     printf("[%s]   IO Block Size               [%lu] bytes\n", __FUNCTION__, statbuf.st_blksize);
     printf("[%s]   Allocated 512B Blocks       [%lu]\n", __FUNCTION__, statbuf.st_blocks);
+#endif
 
     ctx->filesize = statbuf.st_size;
     ctx->buffer = malloc(ctx->filesize);
 
     if (!ctx->buffer) {
-         ERROR("Malloc failed for size[%zu]\n", ctx->filesize);
+         MY_ERROR("Malloc failed for size[%zu]\n", ctx->filesize);
     }
-    printf("[%s] Allocated Buffer              [%lu] bytes @ [%p]\n", __FUNCTION__, ctx->filesize, ctx->buffer);
+    printf("[%s] Allocated Buffer              [%zu] bytes @ [%p]\n", __FUNCTION__, ctx->filesize, ctx->buffer);
 
+#if _WIN32
+    ctx->fp = fopen(ctx->filename, "rb");
+#else
     ctx->fp = fopen(ctx->filename, "r");
+#endif
     if (!ctx->fp) {
-        ERROR("Failed to open file [%d][%s]\n", errno, strerror(errno));
+        MY_ERROR("Failed to open file [%d][%s]\n", errno, strerror(errno));
     }
     printf("[%s] File Opened OK\n", __FUNCTION__);
 }
@@ -74,19 +85,27 @@ void test_setup(void *context) {
     // reset file to start
     int ret = fseek(ctx->fp, 0, SEEK_SET);
     if (ret!=0) {
-        ERROR("Fseek Failed\n");
+        MY_ERROR("Fseek Failed\n");
     }
 }
 
 void test_main(void *context) {
     bool new_new_line = false;
     struct test_context *ctx = (struct test_context *)context;
+
+    // Sample PageFaults Before
+    ctx->faults_before = ReadOSPageFaultCount();
+
+    // Measure Actual Process
     uint64_t start = GET_CPU_TICKS();
     size_t items_read = fread((void *)ctx->buffer, ctx->filesize, 1, ctx->fp);
     uint64_t elapsed_ticks = GET_CPU_TICKS() - start;
 
+    // Sample PageFaults After
+    ctx->faults_after  = ReadOSPageFaultCount();
+
     if (items_read != 1) {
-        ERROR("Failed to read expected items [1] instead read[%zu] | ferror(%d)\n", items_read, ferror(ctx->fp));
+        MY_ERROR("Failed to read expected items [1] instead read[%zu] | ferror(%d)\n", items_read, ferror(ctx->fp));
     }
 
     if (ctx->min_cpu_ticks==0 || elapsed_ticks < ctx->min_cpu_ticks) {
@@ -114,7 +133,6 @@ void test_teardown(void *context) {
 
 void print_stats(void *context) {
     struct test_context *ctx = (struct test_context *)context;
-    struct rusage usage = {};
 
     printf("[%s] name[%s]\n", __FUNCTION__, ctx->name);
     printf("\n");
@@ -127,11 +145,8 @@ void print_stats(void *context) {
     print_data_speed(ctx->filesize, ctx->min_cpu_ticks);
     printf("\n\n");
 
-    int ret = getrusage(RUSAGE_SELF, &usage);
-    if (ret != 0) {
-        ERROR("Failed to call getrusage errno(%d)[%s]\n", errno, strerror(errno));
-    }
-    printf("[%s] Soft PageFautls (No IO): %lu  | Hard PageFautls (IO): %lu\n", __FUNCTION__, usage.ru_minflt, usage.ru_majflt);
+    printf("[%s] PageFautls: %lu\n", __FUNCTION__, (uint32_t)(ctx->faults_after - ctx->faults_before));
+
     printf("\n");
 }
 
@@ -150,6 +165,34 @@ int main (int argc, char *argv[]) {
     char *filename = NULL;
     int runtime = 10;
 
+#ifdef _WIN32
+    for (int index=1; index<argc; ++index) {
+        if (strcmp(argv[index], "-h")==0) {
+            usage();
+            exit(0);
+        } else if (strcmp(argv[index], "-i")==0) {
+            // must have at least index+2 arguments to contain a file
+            if (argc<index+2) {
+                printf("ERROR: missing input file parameter\n");
+                usage();
+                exit(1);
+            }
+            filename = strdup(argv[index+1]);
+            // since we consume the next parameter then skip it
+            ++index;
+        } else if (strcmp(argv[index], "-t")==0) {
+            // must have at least index+2 arguments to contain a file
+            if (argc<index+2) {
+                printf("ERROR: missing output file parameter\n");
+                usage();
+                exit(1);
+            }
+            runtime = atoi(argv[index+1]);
+            // since we consume the next parameter then skip it
+            ++index;
+        }
+    }
+#else
     while( (opt = getopt(argc, argv, "hi:t:")) != -1) {
         switch (opt) {
             case 'h':
@@ -166,15 +209,16 @@ int main (int argc, char *argv[]) {
                 break;
 
             default:
-                fprintf(stderr, "ERROR Invalid command line option\n");
+                fprintf(stderr, "MY_ERROR Invalid command line option\n");
                 usage();
                 exit(1);
                 break;
         }
     }
+#endif
 
     if (!filename) {
-        ERROR("Must pass a filename\n");
+        MY_ERROR("Must pass a filename\n");
     }
 
     printf("==============\n");

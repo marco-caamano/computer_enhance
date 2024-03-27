@@ -3,24 +3,26 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
+#ifndef _WIN32
 #include <getopt.h>
 #include <unistd.h>
+#endif
 #include <errno.h>
 #include <time.h>
+
+#if _WIN32
+#include <intrin.h>
+#include <windows.h>
+#else
 #include <x86intrin.h>
 #include <sys/time.h>
+#endif
 
 #include "reptester.h"
 #include "rdtsc_utils.h"
 
-#define ERROR(...) {                    \
-        fprintf(stderr, __VA_ARGS__);   \
-        exit(1);                        \
-    }
-
-
 void rep_tester(struct rep_tester_config *test_info, void *context) {
-    uint64_t rep_counter = 0;
+    uint32_t rep_counter = 1;
     bool test_done = false;
 
     if (test_info->env_setup) {
@@ -36,7 +38,7 @@ void rep_tester(struct rep_tester_config *test_info, void *context) {
 
     for (;;) {
         if (!test_info->silent) {
-            printf("Run [%05lu] ", rep_counter+1);
+            printf("Run [%05lu] ", rep_counter);
             fflush(stdout);
         }
         if (test_info->test_setup) {
@@ -51,9 +53,9 @@ void rep_tester(struct rep_tester_config *test_info, void *context) {
             // printf("[%s:%d] Calling TearDown\n", __FUNCTION__, __LINE__);
             test_info->test_teardown(context);
         }
-        uint64_t test_runtime_ticks = GET_CPU_TICKS() - test_start_ticks;
 
-        uint64_t current_run_seconds = get_ms_from_cpu_ticks(test_runtime_ticks)/1000;
+        uint64_t elapse_ticks = GET_CPU_TICKS() - test_start_ticks;
+        uint32_t elapsed_seconds = (uint32_t)(get_ms_from_cpu_ticks(elapse_ticks)/1000);
 
         if (test_info->end_of_test_eval) {
             // use TestEval to determine if test is done
@@ -63,16 +65,16 @@ void rep_tester(struct rep_tester_config *test_info, void *context) {
                 if (!test_info->silent) {
                     printf("\n==========\n");
                 }
-                printf("Test has run for [%lu]iterations during [%lu]seconds, TestEval returned test Done. Test Run completed\n\n", rep_counter, current_run_seconds);
+                printf("Test has run for [%lu]iterations during [%lu]seconds, TestEval returned test Done. Test Run completed\n\n", rep_counter, elapsed_seconds);
                 break;
             }
         } else {
             // use time to determine if test is done
-            if ( current_run_seconds > test_info->test_runtime_seconds) {
+            if ( elapsed_seconds > test_info->test_runtime_seconds) {
                 if (!test_info->silent) {
                     printf("\n==========\n");
                 }
-                printf("Test has run for [%lu]iterations during [%lu]seconds, interval was set for [%u]seconds. Test Run completed\n\n", rep_counter, current_run_seconds, test_info->test_runtime_seconds);
+                printf("Test has run for [%lu]iterations during [%lu]seconds, interval was set for [%u]seconds. Test Run completed\n\n", rep_counter, elapsed_seconds, test_info->test_runtime_seconds);
                 break;
             }
         }
@@ -90,7 +92,7 @@ void rep_tester(struct rep_tester_config *test_info, void *context) {
     }
 
     if (test_info->print_stats) {
-        printf("[%s:%d] Calling PrintStats\n", __FUNCTION__, __LINE__);
+        //printf("[%s:%d] Calling PrintStats\n", __FUNCTION__, __LINE__);
         test_info->print_stats(context);
     }
 
