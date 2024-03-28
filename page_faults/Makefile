@@ -1,4 +1,4 @@
-all:  page_faults1 page_faults2 page_faults3 page_faults4 page_faults5
+all:  page_faults1 page_faults2 page_faults3 page_faults4 page_faults5 page_faults6
 
 CC			=	gcc
 CFLAGS		=	-I. -I../rdtsc -I../rep_tester -std=c11 -g -Wall -Werror -D_POSIX_C_SOURCE=200809L -D_DEFAULT_SOURCE
@@ -23,8 +23,11 @@ page_faults4: page_faults4.o
 page_faults5: page_faults5.o 
 	$(CC) $(LD_FLAGS) $@.o -o $@ -lreptester -lrdtsc_utils
 
+page_faults6: page_faults6.o 
+	$(CC) $(LD_FLAGS) $@.o -o $@ -lreptester -lrdtsc_utils
+
 
 .PHONY: clean
 
 clean:
-	rm -f *.o *.a a.out page_faults1 page_faults2 page_faults3 page_faults4
+	rm -f *.o *.a a.out page_faults1 page_faults2 page_faults3 page_faults4 page_faults5 page_faults6

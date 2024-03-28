@@ -14,6 +14,7 @@ call cl /Zi /FC -I..\..\rdtsc\ -I..\..\rep_tester ..\page_faults2.c ..\..\rep_te
 call cl /Zi /FC -I..\..\rdtsc\ ..\page_faults3.c ..\..\rdtsc\build\librdtsc_utils.lib || echo "Command Failed" && popd && exit /B
 call cl /Zi /FC -I..\..\rdtsc\ ..\page_faults4.c ..\..\rdtsc\build\librdtsc_utils.lib || echo "Command Failed" && popd && exit /B
 call cl /Zi /FC -I..\..\rdtsc\ ..\page_faults5.c ..\..\rdtsc\build\librdtsc_utils.lib || echo "Command Failed" && popd && exit /B
+call cl /Zi /FC -I..\..\rdtsc\ ..\page_faults6.c ..\..\rdtsc\build\librdtsc_utils.lib || echo "Command Failed" && popd && exit /B
 
 echo.
 echo.
