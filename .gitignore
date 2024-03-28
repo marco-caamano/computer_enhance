@@ -21,6 +21,8 @@ page_faults1
 page_faults2
 page_faults3
 page_faults4
+page_faults5
+page_faults6
 *.csv
 
 .vscode
