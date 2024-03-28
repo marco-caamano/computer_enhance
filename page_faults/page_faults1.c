@@ -1,23 +1,26 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <stdbool.h>
+#ifdef _WIN32
+#include <Windows.h>
+#else
 #include <getopt.h>
 #include <unistd.h>
+#include <sys/mman.h>
+#endif
 #include <string.h>
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/time.h>
-#include <sys/resource.h>
-#include <sys/mman.h>
 
 #include "reptester.h"
 #include "rdtsc_utils.h"
 
 #define PAGE_SIZE   4096
 
-#define ERROR(...) {                    \
+#define MY_ERROR(...) {                    \
         fprintf(stderr, __VA_ARGS__);   \
         exit(1);                        \
     }
@@ -26,22 +29,12 @@ struct test_context {
     char *name;
     size_t buffer_size;
     uint8_t *buffer;
-    uint64_t touch_size;
-    uint64_t max_touch_size;
+    uint32_t touch_size;
+    uint32_t max_touch_size;
     bool is_test_done;
-    uint64_t start_pagefault_count;
+    uint32_t start_pagefault_count;
 };
 
-uint64_t get_page_faults(void) {
-    struct rusage usage = {};
-    
-    int ret = getrusage(RUSAGE_SELF, &usage);
-    if (ret != 0) {
-        ERROR("Failed to call getrusage errno(%d)[%s]\n", errno, strerror(errno));
-    }
-
-    return (usage.ru_minflt + usage.ru_majflt);
-}
 
 void env_setup(void *context) {
     struct test_context *ctx = (struct test_context *)context;
@@ -54,36 +47,40 @@ void env_setup(void *context) {
     ctx->touch_size = 0;
     ctx->max_touch_size = ctx->buffer_size / PAGE_SIZE;
     ctx->is_test_done = false;
-    printf("[%s] MMAP Buffer Size                   [%lu] bytes\n", __FUNCTION__, ctx->buffer_size);
-    printf("[%s] Max Touch Size                     [%lu] pages\n", __FUNCTION__, ctx->max_touch_size);
+    printf("[%s] MMAP Buffer Size                   [%zu] bytes\n", __FUNCTION__, ctx->buffer_size);
+    printf("[%s] Max Touch Size                     [%u] pages\n", __FUNCTION__, ctx->max_touch_size);
     printf("\n");
 }
 
 void env_teardown(void *context) {
-    struct test_context *ctx = (struct test_context *)context;
-    printf("[%s] name[%s]\n", __FUNCTION__, ctx->name);
+    // struct test_context *ctx = (struct test_context *)context;
+    // printf("[%s] name[%s]\n", __FUNCTION__, ctx->name);
 }
 
 void test_setup(void *context) {
     struct test_context *ctx = (struct test_context *)context;
 
     // allocate memory
+#ifdef _WIN32
+    ctx->buffer = (uint8_t *)VirtualAlloc(0, ctx->buffer_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+#else
     ctx->buffer = mmap(0, ctx->buffer_size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+#endif
     if (!ctx->buffer) {
-         ERROR("mmap     failed for size[%zu]\n", ctx->buffer_size);
+         MY_ERROR("mmap     failed for size[%zu]\n", ctx->buffer_size);
     }
 
-    ctx->start_pagefault_count = get_page_faults();
+    ctx->start_pagefault_count = ReadOSPageFaultCount();
 }
 
 void test_teardown(void *context) {
     struct test_context *ctx = (struct test_context *)context;
 
-    uint64_t current_page_faults = get_page_faults();
+    uint32_t current_page_faults = (uint32_t)ReadOSPageFaultCount();
 
-    uint64_t elapsed_page_faults = current_page_faults - ctx->start_pagefault_count;
+    uint32_t elapsed_page_faults = current_page_faults - ctx->start_pagefault_count;
     
-    printf("[%s] TouchSize[%lu] | PageFaults: %lu (%lu - %lu) \n", __FUNCTION__, ctx->touch_size, elapsed_page_faults, current_page_faults, ctx->start_pagefault_count);
+    printf("[%s] TouchSize[%u] | PageFaults: %u (%lu - %lu) \n", __FUNCTION__, ctx->touch_size, elapsed_page_faults, current_page_faults, ctx->start_pagefault_count);
 
     ctx->touch_size++;
     if (ctx->touch_size > ctx->max_touch_size) {
@@ -92,7 +89,11 @@ void test_teardown(void *context) {
     }
 
     // release memory
+#ifdef _WIN32
+    VirtualFree(ctx->buffer, 0, MEM_RELEASE);
+#else
     munmap(ctx->buffer, ctx->buffer_size);
+#endif
     ctx->buffer = 0;
 }
 
@@ -125,6 +126,14 @@ void usage(void) {
 int main (int argc, char *argv[]) {
     int opt;
 
+#ifdef _WIN32
+    for (int index=1; index<argc; ++index) {
+        if (strcmp(argv[index], "-h")==0) {
+            usage();
+            exit(0);
+        }
+    }
+#else
     while( (opt = getopt(argc, argv, "ht:")) != -1) {
         switch (opt) {
             case 'h':
@@ -133,13 +142,13 @@ int main (int argc, char *argv[]) {
                 break;
 
             default:
-                fprintf(stderr, "ERROR Invalid command line option\n");
+                fprintf(stderr, "MY_ERROR Invalid command line option\n");
                 usage();
                 exit(1);
                 break;
         }
     }
-
+#endif
     printf("=============\n");
     printf("Page Faults 1\n");
     printf("=============\n");
