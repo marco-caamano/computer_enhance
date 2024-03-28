@@ -80,7 +80,7 @@ void test_teardown(void *context) {
 
     uint32_t elapsed_page_faults = current_page_faults - ctx->start_pagefault_count;
     
-    printf("[%s] TouchSize[%u] | PageFaults: %u (%lu - %lu) \n", __FUNCTION__, ctx->touch_size, elapsed_page_faults, current_page_faults, ctx->start_pagefault_count);
+    printf("[%s] TouchSize[%u] | PageFaults: %u (%u - %u) \n", __FUNCTION__, ctx->touch_size, elapsed_page_faults, current_page_faults, ctx->start_pagefault_count);
 
     ctx->touch_size++;
     if (ctx->touch_size > ctx->max_touch_size) {
