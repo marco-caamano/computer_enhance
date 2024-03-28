@@ -1,4 +1,4 @@
-all:  page_faults1 page_faults2 page_faults3 page_faults4
+all:  page_faults1 page_faults2 page_faults3 page_faults4 page_faults5
 
 CC			=	gcc
 CFLAGS		=	-I. -I../rdtsc -I../rep_tester -std=c11 -g -Wall -Werror -D_POSIX_C_SOURCE=200809L -D_DEFAULT_SOURCE
@@ -18,6 +18,9 @@ page_faults3: page_faults3.o
 	$(CC) $(LD_FLAGS) $@.o -o $@ -lreptester -lrdtsc_utils
 
 page_faults4: page_faults4.o 
+	$(CC) $(LD_FLAGS) $@.o -o $@ -lreptester -lrdtsc_utils
+
+page_faults5: page_faults5.o 
 	$(CC) $(LD_FLAGS) $@.o -o $@ -lreptester -lrdtsc_utils
 
 
