@@ -1,8 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <stdbool.h>
-#ifndef _WIN32
+#ifdef _WIN32
+#include <Windows.h>
+#else
 #include <getopt.h>
 #include <unistd.h>
 #endif
@@ -10,8 +13,6 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/time.h>
-#include <sys/resource.h>
 
 #include "reptester.h"
 #include "rdtsc_utils.h"
@@ -29,6 +30,8 @@ struct test_context {
     FILE *fp;
     uint64_t min_cpu_ticks;
     uint64_t max_cpu_ticks;
+    uint64_t faults_before;
+    uint64_t faults_after;
 };
 
 void env_setup(void *context) {
@@ -50,7 +53,11 @@ void env_setup(void *context) {
 
     ctx->filesize = statbuf.st_size;
 
+#ifndef _WIN32
+    ctx->fp = fopen(ctx->filename, "rb");
+#else
     ctx->fp = fopen(ctx->filename, "r");
+#endif
     if (!ctx->fp) {
         MY_ERROR("Failed to open file [%d][%s]\n", errno, strerror(errno));
     }
@@ -82,9 +89,17 @@ void test_setup(void *context) {
 void test_main(void *context) {
     bool new_new_line = false;
     struct test_context *ctx = (struct test_context *)context;
+
+    // Sample PageFaults Before
+    ctx->faults_before = ReadOSPageFaultCount();
+
+    // Measure Actual Process
     uint64_t start = GET_CPU_TICKS();
     size_t items_read = fread((void *)ctx->buffer, ctx->filesize, 1, ctx->fp);
     uint64_t elapsed_ticks = GET_CPU_TICKS() - start;
+
+    // Sample PageFaults After
+    ctx->faults_after  = ReadOSPageFaultCount();
 
     if (items_read != 1) {
         MY_ERROR("Failed to read expected items [1] instead read[%zu] | ferror(%d)\n", items_read, ferror(ctx->fp));
@@ -117,7 +132,6 @@ void test_teardown(void *context) {
 
 void print_stats(void *context) {
     struct test_context *ctx = (struct test_context *)context;
-    struct rusage usage = {};
 
     printf("[%s] name[%s]\n", __FUNCTION__, ctx->name);
     printf("\n");
@@ -130,11 +144,7 @@ void print_stats(void *context) {
     print_data_speed(ctx->filesize, ctx->min_cpu_ticks);
     printf("\n\n");
 
-    int ret = getrusage(RUSAGE_SELF, &usage);
-    if (ret != 0) {
-        MY_ERROR("Failed to call getrusage errno(%d)[%s]\n", errno, strerror(errno));
-    }
-    printf("[%s] Soft PageFautls (No IO): %lu  | Hard PageFautls (IO): %lu\n", __FUNCTION__, usage.ru_minflt, usage.ru_majflt);
+    printf("[%s] PageFautls: %" PRIu32 "\n", __FUNCTION__, (uint32_t)(ctx->faults_after - ctx->faults_before));
     printf("\n");
 }
 
@@ -153,6 +163,34 @@ int main (int argc, char *argv[]) {
     char *filename = NULL;
     int runtime = 10;
 
+#ifdef _WIN32
+    for (int index=1; index<argc; ++index) {
+        if (strcmp(argv[index], "-h")==0) {
+            usage();
+            exit(0);
+        } else if (strcmp(argv[index], "-i")==0) {
+            // must have at least index+2 arguments to contain a file
+            if (argc<index+2) {
+                printf("ERROR: missing input file parameter\n");
+                usage();
+                exit(1);
+            }
+            filename = strdup(argv[index+1]);
+            // since we consume the next parameter then skip it
+            ++index;
+        } else if (strcmp(argv[index], "-t")==0) {
+            // must have at least index+2 arguments to contain a file
+            if (argc<index+2) {
+                printf("ERROR: missing output file parameter\n");
+                usage();
+                exit(1);
+            }
+            runtime = atoi(argv[index+1]);
+            // since we consume the next parameter then skip it
+            ++index;
+        }
+    }
+#else
     while( (opt = getopt(argc, argv, "hi:t:")) != -1) {
         switch (opt) {
             case 'h':
@@ -175,6 +213,7 @@ int main (int argc, char *argv[]) {
                 break;
         }
     }
+#endif
 
     if (!filename) {
         MY_ERROR("Must pass a filename\n");

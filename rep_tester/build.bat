@@ -21,9 +21,9 @@ echo Compile Executables
 echo ===================
 :: Compile executables
 call cl /Zi /FC -I..\..\rdtsc\ ..\rep_test1.c libreptester.lib ..\..\rdtsc\build\librdtsc_utils.lib || echo "Command Failed" && popd && exit /B
-:: call cl /Zi /FC -I..\..\rdtsc\ ..\rep_test2.c libreptester.lib || echo "Command Failed" && popd && exit /B
-:: call cl /Zi /FC -I..\..\rdtsc\ ..\rep_test3.c libreptester.lib || echo "Command Failed" && popd && exit /B
-:: call cl /Zi /FC -I..\..\rdtsc\ ..\rep_test4.c libreptester.lib || echo "Command Failed" && popd && exit /B
+call cl /Zi /FC -I..\..\rdtsc\ ..\rep_test2.c libreptester.lib ..\..\rdtsc\build\librdtsc_utils.lib || echo "Command Failed" && popd && exit /B
+call cl /Zi /FC -I..\..\rdtsc\ ..\rep_test3.c libreptester.lib ..\..\rdtsc\build\librdtsc_utils.lib || echo "Command Failed" && popd && exit /B
+call cl /Zi /FC -I..\..\rdtsc\ ..\rep_test4.c libreptester.lib ..\..\rdtsc\build\librdtsc_utils.lib || echo "Command Failed" && popd && exit /B
 
 echo.
 echo.

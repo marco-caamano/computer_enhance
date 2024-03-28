@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <string.h>
 #include <stdbool.h>
 #ifndef _WIN32
@@ -30,9 +31,9 @@ int main (int argc, char *argv[]) {
     int opt;
     char *input_file = NULL;
     FILE *binary_fp = NULL;
-    unsigned int count = 0;
+    uint32_t count = 0;
     int ret;
-    unsigned int binary_write_count = 0;
+    uint32_t binary_write_count = 0;
     double X0, Y0, X1, Y1 = 0;
     double H_DIST, H_DIST_CALC, sum = 0;
     double delta = 0;
@@ -107,7 +108,7 @@ int main (int argc, char *argv[]) {
         delta = H_DIST - H_DIST_CALC;
         // printf("x0:%3.16f, y0:%3.16f, x1:%3.16f, y1:%3.16f | h_dist:%3.16f | h_dist_calc:%3.16f | delta:%3.16f\n", X0, Y0, X1, Y1, H_DIST, H_DIST_CALC, delta);
         if (delta!=0) {
-            MY_ERROR("Delta[%3.16f] for a row[%lu] is not zero\n", delta, count);
+            MY_ERROR("Delta[%3.16f] for a row[%" PRIu32 "] is not zero\n", delta, count);
         }
         sum += H_DIST_CALC;
         binary_write_count += 5;
@@ -118,7 +119,7 @@ int main (int argc, char *argv[]) {
 
    
     double average = sum/count;
-    printf("binary_write_count     %lu\n", binary_write_count);
+    printf("binary_write_count     %" PRIu32 "\n", binary_write_count);
     printf("binary_bytes_writen    %zu\n", binary_write_count*sizeof(double));
     printf("sum H_DIST_CALC        %3.16f\n", sum);
     printf("average H_DIST_CALC    %3.16f\n\n", average);

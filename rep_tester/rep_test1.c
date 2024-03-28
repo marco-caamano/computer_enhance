@@ -1,13 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <stdbool.h>
 #ifdef _WIN32
 #include <Windows.h>
 #else
 #include <getopt.h>
 #include <unistd.h>
-#include <sys/resource.h>
 #endif
 #include <string.h>
 #include <errno.h>
@@ -145,7 +145,7 @@ void print_stats(void *context) {
     print_data_speed(ctx->filesize, ctx->min_cpu_ticks);
     printf("\n\n");
 
-    printf("[%s] PageFautls: %lu\n", __FUNCTION__, (uint32_t)(ctx->faults_after - ctx->faults_before));
+    printf("[%s] PageFautls: %" PRIu32 "\n", __FUNCTION__, (uint32_t)(ctx->faults_after - ctx->faults_before));
 
     printf("\n");
 }

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <stdbool.h>
 #ifndef _WIN32
 #include <getopt.h>
@@ -10,8 +11,6 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/time.h>
-#include <sys/resource.h>
 
 #include "reptester.h"
 #include "rdtsc_utils.h"
@@ -27,6 +26,8 @@ struct test_context {
     uint8_t *buffer;
     uint64_t min_cpu_ticks;
     uint64_t max_cpu_ticks;
+    uint64_t faults_before;
+    uint64_t faults_after;
 };
 
 void env_setup(void *context) {
@@ -58,12 +59,18 @@ void test_main(void *context) {
     uint32_t count = ctx->buffer_size / sizeof(uint64_t);
     uint64_t *ptr = (uint64_t *)ctx->buffer;
 
+    // Sample PageFaults Before
+    ctx->faults_before = ReadOSPageFaultCount();
+
     uint64_t start = GET_CPU_TICKS();
     for (uint32_t i=0; i<count; i++) {
         *ptr = data | i;
         ptr++;
     }
     uint64_t elapsed_ticks = GET_CPU_TICKS() - start;
+
+    // Sample PageFaults After
+    ctx->faults_after  = ReadOSPageFaultCount();
 
     if (ctx->min_cpu_ticks==0 || elapsed_ticks < ctx->min_cpu_ticks) {
         ctx->min_cpu_ticks = elapsed_ticks;
@@ -92,7 +99,6 @@ void test_teardown(void *context) {
 
 void print_stats(void *context) {
     struct test_context *ctx = (struct test_context *)context;
-    struct rusage usage = {};
 
     printf("[%s] name[%s]\n", __FUNCTION__, ctx->name);
     printf("\n");
@@ -105,11 +111,7 @@ void print_stats(void *context) {
     print_data_speed(ctx->buffer_size, ctx->min_cpu_ticks);
     printf("\n\n");
 
-    int ret = getrusage(RUSAGE_SELF, &usage);
-    if (ret != 0) {
-        MY_ERROR("Failed to call getrusage errno(%d)[%s]\n", errno, strerror(errno));
-    }
-    printf("[%s] Soft PageFautls (No IO): %lu  | Hard PageFautls (IO): %lu\n", __FUNCTION__, usage.ru_minflt, usage.ru_majflt);
+    printf("[%s] PageFautls: %" PRIu32 "\n", __FUNCTION__, (uint32_t)(ctx->faults_after - ctx->faults_before));
     printf("\n");
 }
 
@@ -126,6 +128,24 @@ int main (int argc, char *argv[]) {
     int opt;
     int runtime = 10;
 
+#ifdef _WIN32
+    for (int index=1; index<argc; ++index) {
+        if (strcmp(argv[index], "-h")==0) {
+            usage();
+            exit(0);
+        } else if (strcmp(argv[index], "-t")==0) {
+            // must have at least index+2 arguments to contain a file
+            if (argc<index+2) {
+                printf("ERROR: missing output file parameter\n");
+                usage();
+                exit(1);
+            }
+            runtime = atoi(argv[index+1]);
+            // since we consume the next parameter then skip it
+            ++index;
+        }
+    }
+#else
     while( (opt = getopt(argc, argv, "ht:")) != -1) {
         switch (opt) {
             case 'h':
@@ -144,6 +164,7 @@ int main (int argc, char *argv[]) {
                 break;
         }
     }
+#endif
 
     printf("==============\n");
     printf("REP Test 4\n");

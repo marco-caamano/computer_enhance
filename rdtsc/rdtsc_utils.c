@@ -78,6 +78,7 @@ void InitializeOSMetrics(void)
 
 #include <x86intrin.h>
 #include <sys/time.h>
+#include <sys/resource.h>
 
 static uint64_t GetOSTimerFreq(void)
 {
@@ -97,23 +98,23 @@ static uint64_t ReadOSTimer(void)
 	return Result;
 }
 
-static uint64_t ReadOSPageFaultCount(void)
+uint64_t ReadOSPageFaultCount(void)
 {
     // NOTE(casey): The course materials are not tested on MacOS/Linux.
     // This code was contributed to the public github. It may or may not work
     // for your system.
-    
+
     struct rusage Usage = {};
     getrusage(RUSAGE_SELF, &Usage);
-    
+
     // ru_minflt  the number of page faults serviced without any I/O activity.
     // ru_majflt  the number of page faults serviced that required I/O activity.
     uint64_t Result = Usage.ru_minflt + Usage.ru_majflt;
-    
+
     return Result;
 }
 
-static void InitializeOSMetrics(void)
+void InitializeOSMetrics(void)
 {
 }
 
@@ -157,7 +158,7 @@ uint64_t get_ms_from_cpu_ticks(uint64_t elapsed_cpu_ticks) {
 
 void report_profile_results(void) {
     uint64_t program_elapsed = profile_program_end - profile_program_start;
-    printf("Progran Runtime Ticks[%" PRIu64 "](100%%) [%" PRIu64 "]ms CPU Freq: %I64u\n",
+    printf("Progran Runtime Ticks[%" PRIu64 "](100%%) [%" PRIu64 "]ms CPU Freq: [%" PRIu64 "]\n",
         program_elapsed,
         get_ms_from_cpu_ticks(program_elapsed),
         guess_cpu_freq(100));

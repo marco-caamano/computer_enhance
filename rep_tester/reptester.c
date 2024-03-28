@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <string.h>
 #include <stdbool.h>
 #ifndef _WIN32
@@ -38,7 +39,7 @@ void rep_tester(struct rep_tester_config *test_info, void *context) {
 
     for (;;) {
         if (!test_info->silent) {
-            printf("Run [%05lu] ", rep_counter);
+            printf("Run [%05"PRIu32"] ", rep_counter);
             fflush(stdout);
         }
         if (test_info->test_setup) {
@@ -65,7 +66,7 @@ void rep_tester(struct rep_tester_config *test_info, void *context) {
                 if (!test_info->silent) {
                     printf("\n==========\n");
                 }
-                printf("Test has run for [%lu]iterations during [%lu]seconds, TestEval returned test Done. Test Run completed\n\n", rep_counter, elapsed_seconds);
+                printf("Test has run for [%" PRIu32 "]iterations during [%" PRIu32 "]seconds, TestEval returned test Done. Test Run completed\n\n", rep_counter, elapsed_seconds);
                 break;
             }
         } else {
@@ -74,7 +75,7 @@ void rep_tester(struct rep_tester_config *test_info, void *context) {
                 if (!test_info->silent) {
                     printf("\n==========\n");
                 }
-                printf("Test has run for [%lu]iterations during [%lu]seconds, interval was set for [%u]seconds. Test Run completed\n\n", rep_counter, elapsed_seconds, test_info->test_runtime_seconds);
+                printf("Test has run for [%" PRIu32 "]iterations during [%" PRIu32 "]seconds, interval was set for [%" PRIu32 "]seconds. Test Run completed\n\n", rep_counter, elapsed_seconds, test_info->test_runtime_seconds);
                 break;
             }
         }
@@ -96,6 +97,6 @@ void rep_tester(struct rep_tester_config *test_info, void *context) {
         test_info->print_stats(context);
     }
 
-    printf("\n\nTest Run Completed. Executed test [%lu] times\n\n", rep_counter);
+    printf("\n\nTest Run Completed. Executed test [%" PRIu32 "] times\n\n", rep_counter);
 
 }

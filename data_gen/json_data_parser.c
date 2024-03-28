@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <string.h>
 #include <stdbool.h>
 #ifndef _WIN32
@@ -113,14 +114,14 @@ bool verbose = false;
  */
 
 bool advance_until(char target) {
-    unsigned int bytes_consumed = 0;
+    uint32_t bytes_consumed = 0;
     bool found = false;
     while(!found && file_data_remaining>0) {
         bytes_consumed++;
         file_data_remaining--;
         if ((char)*file_data_ptr==target) {
             // found target and we have already consumed
-            LOG("Found [%c] after [%lu] bytes read\n", target, bytes_consumed);
+            LOG("Found [%c] after [%" PRIu32 "] bytes read\n", target, bytes_consumed);
             found = true;
         }
         file_data_ptr++;
@@ -145,7 +146,7 @@ bool find_string(char *string) {
 // similar to advance_until but it will extract the consumed chars to a
 // given buffer, without the last target char
 bool extract_until(char* buffer, int max_buffer_len, char *target) {
-    unsigned int bytes_consumed = 0;
+    uint32_t bytes_consumed = 0;
     bool found = false;
     // clear buffer so that it is null terminated
     memset(buffer, 0, max_buffer_len);
@@ -155,7 +156,7 @@ bool extract_until(char* buffer, int max_buffer_len, char *target) {
         file_data_remaining--;
         if ((char)*file_data_ptr==*target) {
             // found target and we have already consumed
-            LOG("Found [%c] after [%lu] bytes read buffer[%s]\n", *target, bytes_consumed, buffer);
+            LOG("Found [%c] after [%" PRIu32 "] bytes read buffer[%s]\n", *target, bytes_consumed, buffer);
             found = true;
         } else {
             if (bytes_consumed>max_buffer_len) {
@@ -303,7 +304,7 @@ void calculate_haversine_average(bool preallocate_entries) {
     double H_DIST = 0;
     double sum = 0;
     double average = 0;
-    unsigned int count_values = 0;
+    uint32_t count_values = 0;
 
     TAG_DATA_BLOCK_START(BLOCK_HAVERSINE, "Haversine", data_item_count*sizeof(struct data_item_s));
 
@@ -347,7 +348,7 @@ void calculate_haversine_average(bool preallocate_entries) {
     }
     average = sum/count_values;
 
-    printf("Count                 %lu items\n", count_values);
+    printf("Count                 %" PRIu32 " items\n", count_values);
     printf("sum H_DIST            %3.16f\n", sum);
     printf("average H_DIST        %3.16f\n\n", average);
 
