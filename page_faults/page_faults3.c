@@ -30,18 +30,81 @@
         exit(1);                        \
     }
 
+void usage(void) {
+    fprintf(stderr, "Page Faults 3 Usage:\n");
+    fprintf(stderr, "-h             This help dialog.\n");
+    fprintf(stderr, "-n <num>       Use <num> PAGES to test.\n");
+    fprintf(stderr, "-r             Set reverse sweep of pages\n");
+}
+
 int main (int argc, char *argv[]) {
+    int opt;
+    int num_pages = 0;
+    bool reverse = false;
     char *filename;
     FILE *fp;
     size_t buffer_size;
     uint8_t *buffer;
-    uint32_t max_touch_count;
 
     printf("=========================================\n");
     printf("Page Faults 3: Single Pass PageFault test\n");
     printf("=========================================\n");
 
-    filename = "page_fault3_data.csv";
+#ifdef _WIN32
+    for (int index=1; index<argc; ++index) {
+        if (strcmp(argv[index], "-h")==0) {
+            usage();
+            exit(0);
+        } else if (strcmp(argv[index], "-n")==0) {
+            // must have at least index+2 arguments to contain a file
+            if (argc<index+2) {
+                printf("ERROR: missing input file parameter\n");
+                usage();
+                exit(1);
+            }
+            num_pages = atoi(argv[index+1]);
+            // since we consume the next parameter then skip it
+            ++index;
+        } else if (strcmp(argv[index], "-r")==0) {
+            reverse = true;
+        }
+    }
+#else
+    while( (opt = getopt(argc, argv, "hn:r")) != -1) {
+        switch (opt) {
+            case 'h':
+                usage();
+                exit(0);
+                break;
+
+            case 'n':
+                num_pages = atoi(optarg);
+                break;
+
+            case 'r':
+                reverse = true;
+                break;
+
+            default:
+                fprintf(stderr, "MY_ERROR Invalid command line option\n");
+                usage();
+                exit(1);
+                break;
+        }
+    }
+#endif
+
+    if (num_pages==0) {
+        fprintf(stderr, "ERROR missing number of pages to test with\n");
+        usage();
+        exit(1);
+    }
+
+    if (reverse) {
+        filename = "page_fault3_reverse_data.csv";
+    } else {
+        filename = "page_fault3_data.csv";
+    }
 
     printf("[%s] Using CSV Output File [%s]\n", __FUNCTION__, filename);
     fp = fopen(filename, "w");
@@ -51,11 +114,10 @@ int main (int argc, char *argv[]) {
     printf("[%s] File Opened OK\n", __FUNCTION__);
     fprintf(fp, "Page,PageFaults,StartFaults,EndFaults\n");
 
-    buffer_size = 5*1024*1024;
+    buffer_size = num_pages * PAGE_SIZE;
 
-    max_touch_count = buffer_size / PAGE_SIZE;
     printf("[%s] MMAP Buffer Size                   [%zu] bytes\n", __FUNCTION__, buffer_size);
-    printf("[%s] Max Touch Size                     [%u] pages\n", __FUNCTION__, max_touch_count);
+    printf("[%s] Num Pages                          [%u] pages\n", __FUNCTION__, num_pages);
 
     // allocate memory
 #ifdef _WIN32
@@ -69,15 +131,23 @@ int main (int argc, char *argv[]) {
 
     // Test
     uint8_t data = 0x5a;
+    uint8_t *ptr;
+    uint32_t page;
     
-    for (uint32_t i=0; i<max_touch_count; i++) {
+    for (uint32_t i=0; i<num_pages; i++) {
         uint64_t start_page_faults = ReadOSPageFaultCount();
-        uint8_t *ptr = (buffer + i*PAGE_SIZE);
+        if (reverse) {
+            page = num_pages-i;
+            ptr = (buffer + (num_pages-i-1)*PAGE_SIZE);
+        } else {
+            page = i;
+            ptr = (buffer + i*PAGE_SIZE);
+        }
         *ptr = data;
         uint64_t end_page_faults = ReadOSPageFaultCount();
         uint32_t delta = (uint32_t)(end_page_faults - start_page_faults);
-        printf("Page[%u] | PageFaults: %u (%" PRIu64 " - %" PRIu64 ") \n", i, delta, end_page_faults, start_page_faults);
-        fprintf(fp, "%u,%u,%" PRIu64 ",%" PRIu64 "\n", i, delta, end_page_faults, start_page_faults);
+        printf("Page[%u] | PageFaults: %u (%" PRIu64 " - %" PRIu64 ") \n", page, delta, end_page_faults, start_page_faults);
+        fprintf(fp, "%u,%u,%" PRIu64 ",%" PRIu64 "\n", page, delta, end_page_faults, start_page_faults);
     }
 
     // release memory
@@ -89,6 +159,7 @@ int main (int argc, char *argv[]) {
     buffer = 0;
    
     printf("\n\n");
+    printf("Test Completed OK\n\n");
 
     fclose(fp);
 

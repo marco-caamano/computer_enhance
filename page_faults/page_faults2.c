@@ -33,6 +33,8 @@
 
 struct test_context {
     char *name;
+    int num_pages;
+    bool reverse;
     char *filename;
     FILE *fp;
     size_t buffer_size;
@@ -49,7 +51,11 @@ void env_setup(void *context) {
 
     // printf("[%s] name[%s]\n", __FUNCTION__, ctx->name);
 
-    ctx->filename = "page_fault2_data.csv";
+    if (ctx->reverse) {
+        ctx->filename = "page_fault2_reverse_data.csv";
+    } else {
+        ctx->filename = "page_fault2_data.csv";
+    }
 
     printf("[%s] Using CSV Output File [%s]\n", __FUNCTION__, ctx->filename);
     ctx->fp = fopen(ctx->filename, "w");
@@ -59,7 +65,7 @@ void env_setup(void *context) {
     printf("[%s] File Opened OK\n", __FUNCTION__);
     fprintf(ctx->fp, "TouchCount,PageFaults,StartFaults,EndFaults\n");
 
-    ctx->buffer_size = 5*1024*1024;
+    ctx->buffer_size = ctx->num_pages * PAGE_SIZE;
 
     ctx->touch_count = 1;
     ctx->max_touch_count = ctx->buffer_size / PAGE_SIZE;
@@ -121,16 +127,25 @@ void test_teardown(void *context) {
 
 void test_main(void *context) {
     struct test_context *ctx = (struct test_context *)context;
+    uint8_t *ptr;
 
     uint8_t data = 0x5a;
-    
-    for (uint32_t i=0; i<ctx->touch_count; i++) {
-        uint8_t *ptr = (ctx->buffer + i*PAGE_SIZE);
-        *ptr = data;
+
+    if (ctx->reverse) {
+        // descending writes
+        for (uint32_t i=1; i<=ctx->touch_count; i++) {
+            ptr = (ctx->buffer + ctx->buffer_size - i*PAGE_SIZE);
+            *ptr = data;
+        }
+    } else {
+        // ascending writes
+        for (uint32_t i=0; i<ctx->touch_count; i++) {
+            ptr = (ctx->buffer + i*PAGE_SIZE);
+            *ptr = data;
+        }
     }
+    
 }
-
-
 
 bool test_eval_done(void *context) {
     struct test_context *ctx = (struct test_context *)context;
@@ -138,12 +153,71 @@ bool test_eval_done(void *context) {
     return ctx->is_test_done;
 }
 
+void usage(void) {
+    fprintf(stderr, "Page Faults 2 Usage:\n");
+    fprintf(stderr, "-h             This help dialog.\n");
+    fprintf(stderr, "-n <num>       Use <num> PAGES to test.\n");
+    fprintf(stderr, "-r             Set reverse sweep of pages\n");
+}
 
 int main (int argc, char *argv[]) {
+    int opt;
+    int num_pages = 0;
+    bool reverse = false;
 
     printf("=============\n");
     printf("Page Faults 2\n");
     printf("=============\n");
+
+#ifdef _WIN32
+    for (int index=1; index<argc; ++index) {
+        if (strcmp(argv[index], "-h")==0) {
+            usage();
+            exit(0);
+        } else if (strcmp(argv[index], "-n")==0) {
+            // must have at least index+2 arguments to contain a file
+            if (argc<index+2) {
+                printf("ERROR: missing input file parameter\n");
+                usage();
+                exit(1);
+            }
+            num_pages = atoi(argv[index+1]);
+            // since we consume the next parameter then skip it
+            ++index;
+        } else if (strcmp(argv[index], "-r")==0) {
+            reverse = true;
+        }
+    }
+#else
+    while( (opt = getopt(argc, argv, "hn:r")) != -1) {
+        switch (opt) {
+            case 'h':
+                usage();
+                exit(0);
+                break;
+
+            case 'n':
+                num_pages = atoi(optarg);
+                break;
+
+            case 'r':
+                reverse = true;
+                break;
+
+            default:
+                fprintf(stderr, "MY_ERROR Invalid command line option\n");
+                usage();
+                exit(1);
+                break;
+        }
+    }
+#endif
+
+    if (num_pages==0) {
+        fprintf(stderr, "ERROR missing number of pages to test with\n");
+        usage();
+        exit(1);
+    }
 
     struct rep_tester_config foo = {};
     foo.env_setup = env_setup;
@@ -156,6 +230,8 @@ int main (int argc, char *argv[]) {
 
     struct test_context my_context = {};
     my_context.name = "PageFaults_incremental_single";
+    my_context.num_pages = num_pages;
+    my_context.reverse = reverse;
 
     printf("\n\n");
 
