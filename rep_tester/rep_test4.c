@@ -37,7 +37,7 @@ void env_setup(void *context) {
 }
 
 void env_teardown(void *context) {
-    struct test_context *ctx = (struct test_context *)context;
+    // struct test_context *ctx = (struct test_context *)context;
     // printf("[%s] name[%s]\n", __FUNCTION__, ctx->name);
 }
 
