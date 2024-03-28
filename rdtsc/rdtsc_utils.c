@@ -37,14 +37,14 @@ struct os_metrics
 };
 static struct os_metrics GlobalMetrics;
 
-static uint64_t GetOSTimerFreq(void)
+uint64_t GetOSTimerFreq(void)
 {
 	LARGE_INTEGER Freq;
 	QueryPerformanceFrequency(&Freq);
 	return Freq.QuadPart;
 }
 
-static uint64_t ReadOSTimer(void)
+uint64_t ReadOSTimer(void)
 {
 	LARGE_INTEGER Value;
 	QueryPerformanceCounter(&Value);
@@ -80,14 +80,14 @@ void InitializeOSMetrics(void)
 #include <sys/time.h>
 #include <sys/resource.h>
 
-static uint64_t GetOSTimerFreq(void)
+uint64_t GetOSTimerFreq(void)
 {
     // How many ticks are in a seconds for the time we are using
     // gettimeofday returns values in microseconds so 10^6 ticks/second
 	return 1000000;
 }
 
-static uint64_t ReadOSTimer(void)
+uint64_t ReadOSTimer(void)
 {
 	// NOTE(casey): The "struct" keyword is not necessary here when compiling in C++,
 	// but just in case anyone is using this file from C, I include it.
@@ -153,7 +153,8 @@ uint64_t get_ms_from_cpu_ticks(uint64_t elapsed_cpu_ticks) {
         MY_ERROR("Failed to get CPU Frequency\n");
     }
 
-    return (elapsed_cpu_ticks * GetOSTimerFreq() / 1000) / calculated_cpu_freq;
+    // return (elapsed_cpu_ticks * GetOSTimerFreq() / 1000) / calculated_cpu_freq;
+    return (elapsed_cpu_ticks * 1000) / calculated_cpu_freq;
 }
 
 void report_profile_results(void) {

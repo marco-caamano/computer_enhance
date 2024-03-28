@@ -24,6 +24,7 @@ call cl /Zi /FC ..\perf_test1.c librdtsc_utils.lib || echo "Command Failed" && p
 call cl /Zi /FC ..\perf_test2.c librdtsc_utils.lib || echo "Command Failed" && popd && exit /B
 call cl /Zi /FC ..\perf_test3.c librdtsc_utils.lib || echo "Command Failed" && popd && exit /B
 call cl /Zi /FC ..\perf_test4.c librdtsc_utils.lib || echo "Command Failed" && popd && exit /B
+call cl /Zi /FC ..\rdtsc_test.c librdtsc_utils.lib || echo "Command Failed" && popd && exit /B
 
 echo.
 echo.

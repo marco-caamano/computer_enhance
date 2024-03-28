@@ -94,6 +94,8 @@ extern uint64_t profile_program_start;
 extern uint64_t profile_program_end;
 extern struct profile_block profile_data[];
 
+uint64_t GetOSTimerFreq(void);
+uint64_t ReadOSTimer(void);
 uint64_t ReadOSPageFaultCount(void);
 void InitializeOSMetrics(void);
 
