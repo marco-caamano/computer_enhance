@@ -26,8 +26,6 @@ struct test_context {
     uint8_t *buffer;
     uint64_t min_cpu_ticks;
     uint64_t max_cpu_ticks;
-    uint64_t faults_before;
-    uint64_t faults_after;
 };
 
 void env_setup(void *context) {
@@ -40,7 +38,7 @@ void env_setup(void *context) {
 
 void env_teardown(void *context) {
     struct test_context *ctx = (struct test_context *)context;
-    printf("[%s] name[%s]\n", __FUNCTION__, ctx->name);
+    // printf("[%s] name[%s]\n", __FUNCTION__, ctx->name);
 }
 
 void test_setup(void *context) {
@@ -60,7 +58,7 @@ void test_main(void *context) {
     uint64_t *ptr = (uint64_t *)ctx->buffer;
 
     // Sample PageFaults Before
-    ctx->faults_before = ReadOSPageFaultCount();
+    uint64_t faults_before = ReadOSPageFaultCount();
 
     uint64_t start = GET_CPU_TICKS();
     for (uint32_t i=0; i<count; i++) {
@@ -70,7 +68,13 @@ void test_main(void *context) {
     uint64_t elapsed_ticks = GET_CPU_TICKS() - start;
 
     // Sample PageFaults After
-    ctx->faults_after  = ReadOSPageFaultCount();
+    uint64_t faults_after = ReadOSPageFaultCount();
+
+    uint64_t faults = faults_after - faults_before;
+    if (faults>0) {
+        printf("PageFaults: %" PRIu64 "", faults);
+        new_new_line = true;
+    }
 
     if (ctx->min_cpu_ticks==0 || elapsed_ticks < ctx->min_cpu_ticks) {
         ctx->min_cpu_ticks = elapsed_ticks;
@@ -111,11 +115,7 @@ void print_stats(void *context) {
     print_data_speed(ctx->buffer_size, ctx->min_cpu_ticks);
     printf("\n\n");
 
-    printf("[%s] PageFautls: %" PRIu32 "\n", __FUNCTION__, (uint32_t)(ctx->faults_after - ctx->faults_before));
-    printf("\n");
 }
-
-
 
 
 void usage(void) {

@@ -30,8 +30,6 @@ struct test_context {
     FILE *fp;
     uint64_t min_cpu_ticks;
     uint64_t max_cpu_ticks;
-    uint64_t faults_before;
-    uint64_t faults_after;
 };
 
 void env_setup(void *context) {
@@ -72,7 +70,7 @@ void env_setup(void *context) {
 
 void env_teardown(void *context) {
     struct test_context *ctx = (struct test_context *)context;
-    printf("[%s] name[%s]\n", __FUNCTION__, ctx->name);
+    // printf("[%s] name[%s]\n", __FUNCTION__, ctx->name);
 
     fclose(ctx->fp);
 
@@ -94,18 +92,24 @@ void test_main(void *context) {
     struct test_context *ctx = (struct test_context *)context;
 
     // Sample PageFaults Before
-    ctx->faults_before = ReadOSPageFaultCount();
+    uint64_t faults_before = ReadOSPageFaultCount();
 
     // Measure Actual Process
     uint64_t start = GET_CPU_TICKS();
     size_t items_read = fread((void *)ctx->buffer, ctx->filesize, 1, ctx->fp);
     uint64_t elapsed_ticks = GET_CPU_TICKS() - start;
 
-    // Sample PageFaults After
-    ctx->faults_after  = ReadOSPageFaultCount();
-
     if (items_read != 1) {
         MY_ERROR("Failed to read expected items [1] instead read[%zu] | ferror(%d)\n", items_read, ferror(ctx->fp));
+    }
+
+    // Sample PageFaults After
+    uint64_t faults_after = ReadOSPageFaultCount();
+
+    uint64_t faults = faults_after - faults_before;
+    if (faults>0) {
+        printf("PageFaults: %" PRIu64 "", faults);
+        new_new_line = true;
     }
 
     if (ctx->min_cpu_ticks==0 || elapsed_ticks < ctx->min_cpu_ticks) {
@@ -144,13 +148,7 @@ void print_stats(void *context) {
     printf("[%s] Fastest Speed", __FUNCTION__);
     print_data_speed(ctx->filesize, ctx->min_cpu_ticks);
     printf("\n\n");
-
-    printf("[%s] PageFautls: %" PRIu32 "\n", __FUNCTION__, (uint32_t)(ctx->faults_after - ctx->faults_before));
-
-    printf("\n");
 }
-
-
 
 
 void usage(void) {
