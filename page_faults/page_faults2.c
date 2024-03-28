@@ -20,8 +20,8 @@
 
 /*
  * Incrementally touch pages of allocated memory and
- * see the effects on PageFaults. Write out results
- * to csv file for plotting.
+ * see the effects on PageFaults. Only Touch one byte
+ * per page. Write out results to csv file for plotting.
  */
 
 #define PAGE_SIZE   4096
@@ -47,9 +47,9 @@ struct test_context {
 void env_setup(void *context) {
     struct test_context *ctx = (struct test_context *)context;
 
-    printf("[%s] name[%s]\n", __FUNCTION__, ctx->name);
+    // printf("[%s] name[%s]\n", __FUNCTION__, ctx->name);
 
-    ctx->filename = "page_fault1_data.csv";
+    ctx->filename = "page_fault2_data.csv";
 
     printf("[%s] Using CSV Output File [%s]\n", __FUNCTION__, ctx->filename);
     ctx->fp = fopen(ctx->filename, "w");
@@ -71,12 +71,13 @@ void env_setup(void *context) {
 
 void env_teardown(void *context) {
     struct test_context *ctx = (struct test_context *)context;
-    printf("[%s] name[%s]\n", __FUNCTION__, ctx->name);
+    // printf("[%s] name[%s]\n", __FUNCTION__, ctx->name);
     fclose(ctx->fp);
 }
 
 void test_setup(void *context) {
     struct test_context *ctx = (struct test_context *)context;
+    // printf("[%s] name[%s]\n", __FUNCTION__, ctx->name);
 
     // allocate memory
 #ifdef _WIN32
@@ -93,6 +94,8 @@ void test_setup(void *context) {
 
 void test_teardown(void *context) {
     struct test_context *ctx = (struct test_context *)context;
+
+    // printf("[%s] name[%s]\n", __FUNCTION__, ctx->name);
 
     uint32_t current_page_faults = (uint32_t)ReadOSPageFaultCount();
 
@@ -119,13 +122,11 @@ void test_teardown(void *context) {
 void test_main(void *context) {
     struct test_context *ctx = (struct test_context *)context;
 
-    uint64_t data = 0x5a5a5a5a5a5a5a5a;
-    uint32_t count = (ctx->touch_count*PAGE_SIZE) / sizeof(uint64_t);
-    uint64_t *ptr = (uint64_t *)ctx->buffer;
-
-    for (uint32_t i=0; i<count; i++) {
-        *ptr = data | i;
-        ptr++;
+    uint8_t data = 0x5a;
+    
+    for (uint32_t i=0; i<ctx->touch_count; i++) {
+        uint8_t *ptr = (ctx->buffer + i*PAGE_SIZE);
+        *ptr = data;
     }
 }
 
@@ -133,6 +134,7 @@ void test_main(void *context) {
 
 bool test_eval_done(void *context) {
     struct test_context *ctx = (struct test_context *)context;
+    // printf("[%s] name[%s]\n", __FUNCTION__, ctx->name);
     return ctx->is_test_done;
 }
 
@@ -140,9 +142,8 @@ bool test_eval_done(void *context) {
 int main (int argc, char *argv[]) {
 
     printf("=============\n");
-    printf("Page Faults 1\n");
+    printf("Page Faults 2\n");
     printf("=============\n");
-
 
     struct rep_tester_config foo = {};
     foo.env_setup = env_setup;
@@ -154,7 +155,7 @@ int main (int argc, char *argv[]) {
     foo.silent = true;
 
     struct test_context my_context = {};
-    my_context.name = "PageFaults_incremental";
+    my_context.name = "PageFaults_incremental_single";
 
     printf("\n\n");
 

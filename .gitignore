@@ -18,6 +18,10 @@ rep_test2
 rep_test3
 rep_test4
 page_faults1
+page_faults2
+page_faults3
+page_faults4
+*.csv
 
 .vscode
 
