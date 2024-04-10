@@ -34,7 +34,7 @@ void rep_tester(struct rep_tester_config *test_info, void *context) {
     uint64_t test_start_ticks = GET_CPU_TICKS();
 
     if (!test_info->silent) {
-        printf("\n==========\n");
+        printf("=================\n");
     }
 
     for (;;) {
@@ -64,18 +64,18 @@ void rep_tester(struct rep_tester_config *test_info, void *context) {
             test_done = test_info->end_of_test_eval(context);
             if (test_done) {
                 if (!test_info->silent) {
-                    printf("\n==========\n");
+                    printf("\n=================\n");
                 }
-                printf("Test has run for [%" PRIu32 "]iterations during [%" PRIu32 "]seconds, TestEval returned test Done. Test Run completed\n\n", rep_counter, elapsed_seconds);
+                printf("Test has run for [%" PRIu32 "]iterations during [%" PRIu32 "]seconds, TestEval returned test Done. Test Run completed\n", rep_counter, elapsed_seconds);
                 break;
             }
         } else {
             // use time to determine if test is done
             if ( elapsed_seconds > test_info->test_runtime_seconds) {
                 if (!test_info->silent) {
-                    printf("\n==========\n");
+                    printf("\n=================\n");
                 }
-                printf("Test has run for [%" PRIu32 "]iterations during [%" PRIu32 "]seconds, interval was set for [%" PRIu32 "]seconds. Test Run completed\n\n", rep_counter, elapsed_seconds, test_info->test_runtime_seconds);
+                printf("Test[%s] has run for [%" PRIu32 "]iterations during [%" PRIu32 "]seconds, interval was set for [%" PRIu32 "]seconds. Test Run completed\n", test_info->test_name, rep_counter, elapsed_seconds, test_info->test_runtime_seconds);
                 break;
             }
         }
@@ -97,6 +97,6 @@ void rep_tester(struct rep_tester_config *test_info, void *context) {
         test_info->print_stats(context);
     }
 
-    printf("\n\nTest Run Completed. Executed test [%" PRIu32 "] times\n\n", rep_counter);
+    // printf("Test[%s] Run Completed. Executed test [%" PRIu32 "] times\n\n", test_info->test_name, rep_counter);
 
 }

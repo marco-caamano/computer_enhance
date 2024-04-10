@@ -30,4 +30,4 @@ page_faults6: page_faults6.o
 .PHONY: clean
 
 clean:
-	rm -f *.o *.a a.out page_faults1 page_faults2 page_faults3 page_faults4 page_faults5 page_faults6
+	rm -f *.o *.a a.out page_faults1 page_faults2 page_faults3 page_faults4 page_faults5 page_faults6 *.csv

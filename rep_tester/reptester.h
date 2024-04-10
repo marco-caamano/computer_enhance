@@ -5,6 +5,7 @@ typedef void reptester_function(void *context);
 typedef bool reptester_eval_function(void *context);
 
 struct rep_tester_config {
+    char *test_name;                            // Name of Test
     reptester_function *env_setup;              // Run Only Once at start of test program
     reptester_function *test_setup;             // Run at the start of each test run
     reptester_function *test_main;              // Main Code for the test run
