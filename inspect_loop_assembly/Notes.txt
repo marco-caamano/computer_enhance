@@ -1,0 +1,150 @@
+Z:\caamao_computer_enhance\inspect_loop_assembly\build>fileread_reptest.exe -i data.json -t 30
+==========================
+File Read Repetition Tests
+==========================
+Using filename  [data.json]
+Using runtime   [30]seconds
+
+Test[WriteBytes] starting
+=================
+Run [00001]  | New MinTime [1815226850]Ticks [533]ms (1037.750MB at 1.90 GB/s)  | New MaxTime [1815226850]Ticks [533]ms (1037.750MB at 1.90 GB/s)
+Run [00002]  | New MinTime [1576047050]Ticks [463]ms (1037.750MB at 2.19 GB/s)
+Run [00003]  | New MinTime [1575450520]Ticks [463]ms (1037.750MB at 2.19 GB/s)
+Run [00010]  | New MinTime [1574911042]Ticks [463]ms (1037.750MB at 2.19 GB/s)
+Run [00065]
+=================
+Test[WriteBytes] has run for [65]iterations during [31]seconds, interval was set for [30]seconds. Test Run completed
+Slowest Speed [1815226850]Ticks [533]ms (1037.750MB at 1.90 GB/s)
+Fastest Speed [1574911042]Ticks [463]ms (1037.750MB at 2.19 GB/s)
+
+Test[WriteLongBytes] starting
+=================
+Run [00001]  | New MinTime [287038301]Ticks [84]ms (1037.750MB at 12.06 GB/s)  | New MaxTime [287038301]Ticks [84]ms (1037.750MB at 12.06 GB/s)
+Run [00002]  | New MinTime [274009127]Ticks [80]ms (1037.750MB at 12.67 GB/s)
+Run [00010]  | New MinTime [273260958]Ticks [80]ms (1037.750MB at 12.67 GB/s)
+Run [00013]  | New MaxTime [310347444]Ticks [91]ms (1037.750MB at 11.14 GB/s)
+Run [00024]  | New MinTime [272267954]Ticks [80]ms (1037.750MB at 12.67 GB/s)
+Run [00036]  | New MaxTime [321530894]Ticks [94]ms (1037.750MB at 10.78 GB/s)
+Run [00088]  | New MinTime [272163574]Ticks [80]ms (1037.750MB at 12.67 GB/s)
+Run [00091]  | New MinTime [271743504]Ticks [79]ms (1037.750MB at 12.83 GB/s)
+Run [00093]  | New MinTime [271641470]Ticks [79]ms (1037.750MB at 12.83 GB/s)
+Run [00095]  | New MinTime [271198110]Ticks [79]ms (1037.750MB at 12.83 GB/s)
+Run [00098]  | New MinTime [269899140]Ticks [79]ms (1037.750MB at 12.83 GB/s)
+Run [00103]  | New MinTime [269806082]Ticks [79]ms (1037.750MB at 12.83 GB/s)
+Run [00159]  | New MinTime [269438032]Ticks [79]ms (1037.750MB at 12.83 GB/s)
+Run [00172]  | New MinTime [269206730]Ticks [79]ms (1037.750MB at 12.83 GB/s)
+Run [00192]  | New MinTime [268658650]Ticks [79]ms (1037.750MB at 12.83 GB/s)
+Run [00248]  | New MinTime [268517312]Ticks [78]ms (1037.750MB at 12.99 GB/s)
+Run [00304]  | New MaxTime [324083172]Ticks [95]ms (1037.750MB at 10.67 GB/s)
+Run [00351]  | New MinTime [268333406]Ticks [78]ms (1037.750MB at 12.99 GB/s)
+Run [00381]
+=================
+Test[WriteLongBytes] has run for [381]iterations during [31]seconds, interval was set for [30]seconds. Test Run completed
+Slowest Speed [324083172]Ticks [95]ms (1037.750MB at 10.67 GB/s)
+Fastest Speed [268333406]Ticks [78]ms (1037.750MB at 12.99 GB/s)
+
+Test[fread] starting
+=================
+Run [00001]  | New MinTime [2473190039]Ticks [727]ms (1037.750MB at 1.39 GB/s)  | New MaxTime [2473190039]Ticks [727]ms (1037.750MB at 1.39 GB/s)
+Run [00002]  | New MinTime [543139494]Ticks [159]ms (1037.750MB at 6.37 GB/s)
+Run [00004]  | New MinTime [542202590]Ticks [159]ms (1037.750MB at 6.37 GB/s)
+Run [00005]  | New MinTime [542183754]Ticks [159]ms (1037.750MB at 6.37 GB/s)
+Run [00006]  | New MinTime [540018516]Ticks [158]ms (1037.750MB at 6.41 GB/s)
+Run [00190]
+=================
+Test[fread] has run for [190]iterations during [31]seconds, interval was set for [30]seconds. Test Run completed
+Slowest Speed [2473190039]Ticks [727]ms (1037.750MB at 1.39 GB/s)
+Fastest Speed [540018516]Ticks [158]ms (1037.750MB at 6.41 GB/s)
+
+Test[_read] starting
+=================
+Run [00001]  | New MinTime [542884833]Ticks [159]ms (1037.750MB at 6.37 GB/s)  | New MaxTime [542884833]Ticks [159]ms (1037.750MB at 6.37 GB/s)
+Run [00002]  | New MinTime [541757937]Ticks [159]ms (1037.750MB at 6.37 GB/s)
+Run [00004]  | New MinTime [541361906]Ticks [159]ms (1037.750MB at 6.37 GB/s)
+Run [00005]  | New MinTime [540240722]Ticks [158]ms (1037.750MB at 6.41 GB/s)
+Run [00006]  | New MaxTime [547827889]Ticks [161]ms (1037.750MB at 6.29 GB/s)
+Run [00010]  | New MaxTime [567244100]Ticks [166]ms (1037.750MB at 6.10 GB/s)
+Run [00026]  | New MinTime [539108012]Ticks [158]ms (1037.750MB at 6.41 GB/s)
+Run [00032]  | New MinTime [539038142]Ticks [158]ms (1037.750MB at 6.41 GB/s)
+Run [00049]  | New MaxTime [578976854]Ticks [170]ms (1037.750MB at 5.96 GB/s)
+Run [00142]  | New MaxTime [592113026]Ticks [174]ms (1037.750MB at 5.82 GB/s)
+Run [00193]
+=================
+Test[_read] has run for [193]iterations during [31]seconds, interval was set for [30]seconds. Test Run completed
+Slowest Speed [592113026]Ticks [174]ms (1037.750MB at 5.82 GB/s)
+Fastest Speed [539038142]Ticks [158]ms (1037.750MB at 6.41 GB/s)
+
+Test[ReadFile] starting
+=================
+Run [00001]  | New MinTime [547760808]Ticks [161]ms (1037.750MB at 6.29 GB/s)  | New MaxTime [547760808]Ticks [161]ms (1037.750MB at 6.29 GB/s)
+Run [00002]  | New MinTime [547042150]Ticks [160]ms (1037.750MB at 6.33 GB/s)
+Run [00003]  | New MaxTime [548201924]Ticks [161]ms (1037.750MB at 6.29 GB/s)
+Run [00004]  | New MaxTime [550631530]Ticks [161]ms (1037.750MB at 6.29 GB/s)
+Run [00006]  | New MaxTime [551207218]Ticks [162]ms (1037.750MB at 6.26 GB/s)
+Run [00007]  | New MinTime [544592518]Ticks [160]ms (1037.750MB at 6.33 GB/s)
+Run [00009]  | New MaxTime [555467894]Ticks [163]ms (1037.750MB at 6.22 GB/s)
+Run [00014]  | New MinTime [543574558]Ticks [159]ms (1037.750MB at 6.37 GB/s)
+Run [00022]  | New MaxTime [564673734]Ticks [166]ms (1037.750MB at 6.10 GB/s)
+Run [00029]  | New MinTime [543567826]Ticks [159]ms (1037.750MB at 6.37 GB/s)
+Run [00030]  | New MinTime [542360044]Ticks [159]ms (1037.750MB at 6.37 GB/s)
+Run [00032]  | New MinTime [541631968]Ticks [159]ms (1037.750MB at 6.37 GB/s)
+Run [00035]  | New MaxTime [565013224]Ticks [166]ms (1037.750MB at 6.10 GB/s)
+Run [00042]  | New MaxTime [594506592]Ticks [174]ms (1037.750MB at 5.82 GB/s)
+Run [00118]  | New MinTime [540296346]Ticks [158]ms (1037.750MB at 6.41 GB/s)
+Run [00125]  | New MinTime [540032370]Ticks [158]ms (1037.750MB at 6.41 GB/s)
+Run [00146]  | New MinTime [539296678]Ticks [158]ms (1037.750MB at 6.41 GB/s)
+Run [00192]
+=================
+Test[ReadFile] has run for [192]iterations during [31]seconds, interval was set for [30]seconds. Test Run completed
+Slowest Speed [594506592]Ticks [174]ms (1037.750MB at 5.82 GB/s)
+Fastest Speed [539296678]Ticks [158]ms (1037.750MB at 6.41 GB/s)
+
+
+=========================
+Summary
+=========================
+
+Test [fread]
+Slowest Speed [2473190039]Ticks [727]ms (1037.750MB at 1.39 GB/s)
+Fastest Speed [540018516]Ticks [158]ms (1037.750MB at 6.41 GB/s)
+
+Test [_read]
+Slowest Speed [592113026]Ticks [174]ms (1037.750MB at 5.82 GB/s)
+Fastest Speed [539038142]Ticks [158]ms (1037.750MB at 6.41 GB/s)
+
+Test [ReadFile]
+Slowest Speed [594506592]Ticks [174]ms (1037.750MB at 5.82 GB/s)
+Fastest Speed [539296678]Ticks [158]ms (1037.750MB at 6.41 GB/s)
+
+Test [WriteBytes]
+Slowest Speed [1815226850]Ticks [533]ms (1037.750MB at 1.90 GB/s)
+Fastest Speed [1574911042]Ticks [463]ms (1037.750MB at 2.19 GB/s)
+
+Test [WriteLongBytes]
+Slowest Speed [324083172]Ticks [95]ms (1037.750MB at 10.67 GB/s)
+Fastest Speed [268333406]Ticks [78]ms (1037.750MB at 12.99 GB/s)
+
+
+Z:\caamao_computer_enhance\inspect_loop_assembly\build>
+
+
+==================================================================================================================================================
+
+We have throughput like 2.19 GB/s (2.19x1024^3)byte/second for WriteBytes and we know the CPU frequency 3.4GHz (3.4x1000^3) cycles/second
+
+For WriteBytes, the loop writes 1byte for each iteration
+
+(1 byte / loop)
+
+(3.4x1000^3) (cycles/s)    3,400,000,000 (cycles)(1/s)
+----------------------- =  ---------------------------  =  1.445 cycles / byte
+(2.19x1024^3) byte/s       2,351,494,594.56 byte (1/s)
+
+From the debugger:
+
+00007FF734A9F0F8  48 8b 4b 18                                  mov             rcx, qword ptr [rbx+0x18]
+00007FF734A9F0FC  88 14 0a                                     mov             byte ptr [rdx+rcx*1], dl
+00007FF734A9F0FF  48 ff c2                                     inc             rdx
+00007FF734A9F102  48 3b 53 10                                  cmp             rdx, qword ptr [rbx+0x10]
+
+loop has 4 instructions encoded in 14 bytes

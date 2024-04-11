@@ -201,6 +201,20 @@ void report_profile_results(void) {
 #define MEGABYTE    ((double)1024*(double)1024)
 #define GIGABYTE    (MEGABYTE*(double)1024)
 
+double get_bps(uint64_t total_bytes, uint64_t total_cpu_ticks) {
+    double seconds = (double)get_ms_from_cpu_ticks(total_cpu_ticks) / (double)1000;
+    double bytes_per_second = (double)total_bytes / seconds;
+    return bytes_per_second;
+}
+
+double get_gbs(uint64_t total_bytes, uint64_t total_cpu_ticks) {
+    double seconds = (double)get_ms_from_cpu_ticks(total_cpu_ticks) / (double)1000;
+    double bytes_per_second = (double)total_bytes / seconds;
+    double megabytes = (double)total_bytes / MEGABYTE;
+    double gigabytes_per_second = bytes_per_second / GIGABYTE;
+    return gigabytes_per_second;
+}
+
 void print_data_speed(uint64_t total_bytes, uint64_t total_cpu_ticks) {
     double seconds = (double)get_ms_from_cpu_ticks(total_cpu_ticks) / (double)1000;
     double bytes_per_second = (double)total_bytes / seconds;

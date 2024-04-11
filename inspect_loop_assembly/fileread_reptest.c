@@ -538,6 +538,21 @@ int main (int argc, char *argv[]) {
     print_stats(&writelongbytes_context);
     printf("\n");
 
+    printf("\n\n");
+    printf("------------------\n");
+    printf("Review WriteBytes:\n");
+    printf("------------------\n");
+
+    uint64_t cpu_freq = guess_cpu_freq(100);
+    printf("CPU Frequency [%" PRIu64 "] (estimated)\n", cpu_freq);
+
+    double bps = get_bps(writebytes_context.filesize, writebytes_context.min_cpu_ticks);
+
+    printf("Bytes Per Second [%f] bps\n", bps);
+
+    double cycles_per_byte = cpu_freq / bps;
+
+    printf("Cycles per Byte [%f] \n", cycles_per_byte);
 
     free(buffer);
 

@@ -104,5 +104,7 @@ uint64_t get_ms_from_cpu_ticks(uint64_t elapsed_cpu_ticks);
 
 void report_profile_results(void);
 
+double get_bps(uint64_t total_bytes, uint64_t total_cpu_ticks);
+double get_gbs(uint64_t total_bytes, uint64_t total_cpu_ticks);
 void print_data_speed(uint64_t total_bytes, uint64_t total_cpu_ticks);
 
