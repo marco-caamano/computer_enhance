@@ -245,11 +245,13 @@ void writebytes_main(void *context) {
     bool result;
     struct test_context *ctx = (struct test_context *)context;
 
+    uint8_t *ptr = ctx->buffer;
+
     // Measure Actual Process
     uint64_t start = GET_CPU_TICKS();
 
-    for (uint64_t index=0; index<ctx->filesize; ++index) {
-        ctx->buffer[index] = (uint8_t)index;
+    for (size_t index=0; index<ctx->filesize; ++index) {
+        ptr[index] = (uint8_t)index;
     }
 
     uint64_t elapsed_ticks = GET_CPU_TICKS() - start;
@@ -331,6 +333,7 @@ void writelongbytes_main(void *context) {
 
 void print_stats(void *context) {
     struct test_context *ctx = (struct test_context *)context;
+    uint64_t cpu_freq = guess_cpu_freq(100);
 
     printf("Slowest Speed");
     print_data_speed(ctx->filesize, ctx->max_cpu_ticks);
@@ -338,6 +341,11 @@ void print_stats(void *context) {
     printf("Fastest Speed");
     print_data_speed(ctx->filesize, ctx->min_cpu_ticks);
     printf("\n");
+
+    double bps = get_bps(ctx->filesize, ctx->min_cpu_ticks);
+    printf("Bytes Per Second [%f] bps\n", bps);
+    double cycles_per_byte = cpu_freq / bps;
+    printf("Cycles per Byte [%f] \n", cycles_per_byte);
 }
 
 
@@ -424,6 +432,7 @@ int main (int argc, char *argv[]) {
     fread_test.env_teardown = fread_env_teardown;
     fread_test.print_stats = print_stats;
     fread_test.test_runtime_seconds = runtime;
+    fread_test.context = (void *)&fread_context;
 
     // ===================================================================================
     // _read test
@@ -443,6 +452,7 @@ int main (int argc, char *argv[]) {
     _read_test.env_teardown = _read_env_teardown;
     _read_test.print_stats = print_stats;
     _read_test.test_runtime_seconds = runtime;
+    _read_test.context = (void *)&_read_context;
 
     // ===================================================================================
     // ReadFile test
@@ -462,6 +472,7 @@ int main (int argc, char *argv[]) {
     readfile_test.env_teardown = readfile_env_teardown;
     readfile_test.print_stats = print_stats;
     readfile_test.test_runtime_seconds = runtime;
+    readfile_test.context = (void *)&readfile_context;
 
     // ===================================================================================
     // WriteBytes test
@@ -481,6 +492,7 @@ int main (int argc, char *argv[]) {
     writebytes_test.env_teardown = writebytes_env_teardown;
     writebytes_test.print_stats = print_stats;
     writebytes_test.test_runtime_seconds = runtime;
+    writebytes_test.context = (void*)&writebytes_context;
 
     // ===================================================================================
     // WriteLongBytes test
@@ -500,16 +512,23 @@ int main (int argc, char *argv[]) {
     writelongbytes_test.env_teardown = writelongbytes_env_teardown;
     writelongbytes_test.print_stats = print_stats;
     writelongbytes_test.test_runtime_seconds = runtime;
+    writelongbytes_test.context = (void*)&writelongbytes_context;
 
     // ===================================================================================
     // Run Tests
     // ===================================================================================
 
-    rep_tester(&writebytes_test, &writebytes_context);
-    rep_tester(&writelongbytes_test, &writelongbytes_context);
-    rep_tester(&fread_test, &fread_context);
-    rep_tester(&_read_test, &_read_context);
-    rep_tester(&readfile_test, &readfile_context);
+    struct rep_tester_config tests[] = {
+        fread_test,
+        _read_test,
+        readfile_test,
+        writebytes_test,
+        writelongbytes_test
+    };
+
+    int count = (int) (sizeof(tests)/sizeof(struct rep_tester_config));
+
+    rep_tester_run(tests, count);
 
     // ===================================================================================
 
@@ -517,42 +536,17 @@ int main (int argc, char *argv[]) {
     printf("=========================\n");
     printf("Summary\n");
     printf("=========================\n\n");
-    
-    printf("Test [%s]\n", fread_context.name);
-    print_stats(&fread_context);
-    printf("\n");
-
-    printf("Test [%s]\n", _read_context.name);
-    print_stats(&_read_context);
-    printf("\n");
-
-    printf("Test [%s]\n", readfile_context.name);
-    print_stats(&readfile_context);
-    printf("\n");
-
-    printf("Test [%s]\n", writebytes_context.name);
-    print_stats(&writebytes_context);
-    printf("\n");
-
-    printf("Test [%s]\n", writelongbytes_context.name);
-    print_stats(&writelongbytes_context);
-    printf("\n");
-
-    printf("\n\n");
-    printf("------------------\n");
-    printf("Review WriteBytes:\n");
-    printf("------------------\n");
 
     uint64_t cpu_freq = guess_cpu_freq(100);
     printf("CPU Frequency [%" PRIu64 "] (estimated)\n", cpu_freq);
 
-    double bps = get_bps(writebytes_context.filesize, writebytes_context.min_cpu_ticks);
+    for (int i=0; i<count; ++i) {
+        printf("Test [%s]\n", tests[i].test_name);
+        print_stats(tests[i].context);
+        printf("\n");
+    }
 
-    printf("Bytes Per Second [%f] bps\n", bps);
-
-    double cycles_per_byte = cpu_freq / bps;
-
-    printf("Cycles per Byte [%f] \n", cycles_per_byte);
+    printf("\n\n");
 
     free(buffer);
 

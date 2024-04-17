@@ -15,8 +15,10 @@ struct rep_tester_config {
     reptester_eval_function *end_of_test_eval;  // Instead of a runtime call this function to determine if we should stop running
     uint32_t test_runtime_seconds;              // Number of second to run for. 0 for infinite loop
     bool silent;                                // Run Silent Loop, do not printout the loop counter
+    void *context;                              // Test Context
 };
 
 
-void rep_tester(struct rep_tester_config *test_info, void *context);
+void rep_tester_run(struct rep_tester_config test_info[], int count);
+void rep_tester_run(struct rep_tester_config *test_info, int count);
 

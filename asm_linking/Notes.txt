@@ -1,0 +1,87 @@
+Z:\caamao_computer_enhance\asm_linking\build>asm_link_test.exe
+==========================
+File Read Repetition Tests
+==========================
+Using runtime   [10]seconds
+Count tests: 5
+[0] Test [write_bytes] context[0x000000508B4FF700]
+[1] Test [move_all_bytes] context[0x000000508B4FF728]
+[2] Test [nop_all_bytes] context[0x000000508B4FF750]
+[3] Test [cmp_all_bytes] context[0x000000508B4FF778]
+[4] Test [dec_all_bytes] context[0x000000508B4FF7A0]
+
+Running Test [write_bytes]
+=================================================
+Run [00048]  | New MinTime [767320432]Ticks [225]ms (1024.000MB at 4.44 GB/s)
+=================================================
+Test[write_bytes] has run for [48]iterations during [11]seconds, interval was set for [10]seconds. Test Run completed
+Fastest Speed [767320432]Ticks [225]ms (1024.000MB at 4.44 GB/s)
+Bytes Per Second [4772185884.444445] bps
+Cycles per Byte [0.712467]
+
+Running Test [move_all_bytes]
+=================================================
+Run [00049]  | New MinTime [760949393]Ticks [223]ms (1024.000MB at 4.48 GB/s)
+=================================================
+Test[move_all_bytes] has run for [49]iterations during [11]seconds, interval was set for [10]seconds. Test Run completed
+Fastest Speed [760949393]Ticks [223]ms (1024.000MB at 4.48 GB/s)
+Bytes Per Second [4814985757.847533] bps
+Cycles per Byte [0.706134]
+
+Running Test [nop_all_bytes]
+=================================================
+Run [00050]  | New MinTime [749099390]Ticks [220]ms (1024.000MB at 4.55 GB/s)
+=================================================
+Test[nop_all_bytes] has run for [50]iterations during [11]seconds, interval was set for [10]seconds. Test Run completed
+Fastest Speed [749099390]Ticks [220]ms (1024.000MB at 4.55 GB/s)
+Bytes Per Second [4880644654.545455] bps
+Cycles per Byte [0.696634]
+
+Running Test [cmp_all_bytes]
+=================================================
+Run [00050]  | New MinTime [747978852]Ticks [219]ms (1024.000MB at 4.57 GB/s)
+=================================================
+Test[cmp_all_bytes] has run for [50]iterations during [11]seconds, interval was set for [10]seconds. Test Run completed
+Fastest Speed [747978852]Ticks [219]ms (1024.000MB at 4.57 GB/s)
+Bytes Per Second [4902930703.196347] bps
+Cycles per Byte [0.693467]
+
+Running Test [dec_all_bytes]
+=================================================
+Run [00049] | New MinTime [744233310]Ticks [218]ms (1024.000MB at 4.59 GB/s) ------
+=================================================
+Test[dec_all_bytes] has run for [49]iterations during [11]seconds, interval was set for [10]seconds. Test Run completed
+Fastest Speed [744233310]Ticks [218]ms (1024.000MB at 4.59 GB/s)
+Bytes Per Second [4925421211.009174] bps
+Cycles per Byte [0.690301]
+
+
+=========================
+Summary
+=========================
+
+CPU Frequency [3400024480] (estimated)
+[0] Test [write_bytes] context[0x000000508B4FF700]
+Fastest Speed [767320432]Ticks [225]ms (1024.000MB at 4.44 GB/s)
+Bytes Per Second [4772185884.444445] bps
+Cycles per Byte [0.712464]
+
+[1] Test [move_all_bytes] context[0x000000508B4FF728]
+Fastest Speed [760949393]Ticks [223]ms (1024.000MB at 4.48 GB/s)
+Bytes Per Second [4814985757.847533] bps
+Cycles per Byte [0.706133]
+
+[2] Test [nop_all_bytes] context[0x000000508B4FF750]
+Fastest Speed [749099390]Ticks [220]ms (1024.000MB at 4.55 GB/s)
+Bytes Per Second [4880644654.545455] bps
+Cycles per Byte [0.696632]
+
+[3] Test [cmp_all_bytes] context[0x000000508B4FF778]
+Fastest Speed [747978852]Ticks [219]ms (1024.000MB at 4.57 GB/s)
+Bytes Per Second [4902930703.196347] bps
+Cycles per Byte [0.693467]
+
+[4] Test [dec_all_bytes] context[0x000000508B4FF7A0]
+Fastest Speed [744233310]Ticks [218]ms (1024.000MB at 4.59 GB/s)
+Bytes Per Second [4925421211.009174] bps
+Cycles per Byte [0.690300]
